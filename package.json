@@ -1,0 +1,80 @@
+{
+  "name": "@featureflagshq/sdk",
+  "version": "1.0.0",
+  "description": "Official FeatureFlagsHQ SDK for JavaScript/TypeScript with advanced security features",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "build:dev": "rollup -c -w",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run test",
+    "docs": "typedoc src/index.ts --out docs",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "feature-flags",
+    "feature-toggles",
+    "feature-management",
+    "a/b-testing",
+    "experiments",
+    "remote-config",
+    "typescript",
+    "javascript",
+    "nodejs",
+    "browser"
+  ],
+  "author": "FeatureFlagsHQ <support@featureflagshq.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/featureflagshq/sdk-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/featureflagshq/sdk-node/issues"
+  },
+  "homepage": "https://featureflagshq.com",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/jest": "^29.5.5",
+    "@types/node": "^20.6.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.0",
+    "@typescript-eslint/parser": "^6.7.0",
+    "eslint": "^8.49.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.0.3",
+    "rimraf": "^5.0.1",
+    "rollup": "^3.29.4",
+    "rollup-plugin-typescript2": "^0.36.0",
+    "ts-jest": "^29.1.1",
+    "typedoc": "^0.25.1",
+    "typescript": "^5.2.2"
+  },
+  "peerDependencies": {
+    "node-fetch": "^3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "node-fetch": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
