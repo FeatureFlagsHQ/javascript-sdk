@@ -607,7 +607,7 @@ The SDK implements multiple security layers:
 
 ## 🆘 Support
 
-- **Documentation**: [https://docs.featureflagshq.com](https://docs.featureflagshq.com)
+- **Documentation**: [Official docs](https://featureflagshq.com/documentation/)
 - **Issues**: [GitHub Issues](https://github.com/featureflagshq/javascript-sdk/issues)
 - **Email**: hello@featureflagshq.com
 
