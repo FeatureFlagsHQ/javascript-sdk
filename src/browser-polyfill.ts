@@ -17,8 +17,8 @@ export const crypto = (() => {
               const array = Array.from(new Uint8Array(buffer));
               return array.map(b => b.toString(16).padStart(2, '0')).join('');
             });
-          }
-        })
+          },
+        }),
       }),
       createHmac: (_algorithm: string, secret: string) => ({
         update: (data: string) => ({
@@ -26,23 +26,18 @@ export const crypto = (() => {
             const encoder = new TextEncoder();
             const keyBuffer = encoder.encode(secret);
             const dataBuffer = encoder.encode(data);
-            
-            return window.crypto.subtle.importKey(
-              'raw',
-              keyBuffer,
-              { name: 'HMAC', hash: 'SHA-256' },
-              false,
-              ['sign']
-            ).then(key => 
-              window.crypto.subtle.sign('HMAC', key, dataBuffer)
-            ).then(signature => {
-              const array = Array.from(new Uint8Array(signature));
-              const base64 = btoa(String.fromCharCode.apply(null, array));
-              return base64;
-            });
-          }
-        })
-      })
+
+            return window.crypto.subtle
+              .importKey('raw', keyBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+              .then(key => window.crypto.subtle.sign('HMAC', key, dataBuffer))
+              .then(signature => {
+                const array = Array.from(new Uint8Array(signature));
+                const base64 = btoa(String.fromCharCode.apply(null, array));
+                return base64;
+              });
+          },
+        }),
+      }),
     };
   } else {
     // Node.js environment
@@ -123,7 +118,7 @@ export const process = (() => {
       platform: 'browser',
       version: 'browser',
       pid: 1,
-      env: {}
+      env: {},
     };
   } else {
     return globalThis.process || require('process');
@@ -135,7 +130,7 @@ export const os = (() => {
   if (typeof window !== 'undefined') {
     return {
       hostname: () => window.location.hostname || 'browser',
-      platform: () => navigator.platform || 'browser'
+      platform: () => navigator.platform || 'browser',
     };
   } else {
     try {
@@ -143,7 +138,7 @@ export const os = (() => {
     } catch {
       return {
         hostname: () => 'unknown',
-        platform: () => 'unknown'
+        platform: () => 'unknown',
       };
     }
   }

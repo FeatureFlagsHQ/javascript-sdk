@@ -66,13 +66,13 @@ if (typeof window !== 'undefined') {
     platform: 'browser',
     version: 'browser',
     pid: Math.floor(Math.random() * 10000),
-    env: {}
+    env: {},
   };
 
   os = {
     hostname: () => window.location.hostname || 'browser',
     platform: () => navigator.platform || 'browser',
-    cpuCount: () => navigator.hardwareConcurrency || 1
+    cpuCount: () => navigator.hardwareConcurrency || 1,
   };
 
   // Browser crypto using Web Crypto API
@@ -85,8 +85,8 @@ if (typeof window !== 'undefined') {
           const buffer = await window.crypto.subtle.digest('SHA-256', dataBuffer);
           const array = Array.from(new Uint8Array(buffer));
           return array.map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-      })
+        },
+      }),
     }),
     createHmac: (_algorithm: string, secret: string) => ({
       update: (data: string) => ({
@@ -94,22 +94,18 @@ if (typeof window !== 'undefined') {
           const encoder = new TextEncoder();
           const keyBuffer = encoder.encode(secret);
           const dataBuffer = encoder.encode(data);
-          
-          const key = await window.crypto.subtle.importKey(
-            'raw',
-            keyBuffer,
-            { name: 'HMAC', hash: 'SHA-256' },
-            false,
-            ['sign']
-          );
-          
+
+          const key = await window.crypto.subtle.importKey('raw', keyBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, [
+            'sign',
+          ]);
+
           const signature = await window.crypto.subtle.sign('HMAC', key, dataBuffer);
           const array = Array.from(new Uint8Array(signature));
           const base64 = btoa(String.fromCharCode.apply(null, array as any));
           return base64;
-        }
-      })
-    })
+        },
+      }),
+    }),
   };
 } else {
   // Node.js environment
@@ -316,9 +312,7 @@ class SecurityFilter {
   static filter(message: string): string {
     let filtered = message;
     for (const pattern of this.SENSITIVE_PATTERNS) {
-      filtered = filtered.replace(pattern, (match, group) => 
-        match.replace(group, '[REDACTED]')
-      );
+      filtered = filtered.replace(pattern, (match, group) => match.replace(group, '[REDACTED]'));
     }
     return filtered;
   }
@@ -387,8 +381,8 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       total_ms: 0,
       count: 0,
       min_ms: Infinity,
-      max_ms: 0
-    }
+      max_ms: 0,
+    },
   };
 
   // Circuit breaker
@@ -397,7 +391,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     last_failure_time: null as number | null,
     state: 'closed' as 'closed' | 'open' | 'half-open',
     failure_threshold: 5,
-    recovery_timeout: 60000
+    recovery_timeout: 60000,
   };
 
   // Rate limiting
@@ -414,14 +408,9 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     super();
 
     // Get credentials from environment if not provided - Enhanced to match Python SDK
-    const clientId = config.clientId || 
-      process.env?.FEATUREFLAGSHQ_CLIENT_ID || 
-      process.env?.FEATUREFLAGSHQ_CLIENT_KEY; // Added CLIENT_KEY support
-    const clientSecret = config.clientSecret || 
-      process.env?.FEATUREFLAGSHQ_CLIENT_SECRET;
-    const environment = config.environment || 
-      process.env?.FEATUREFLAGSHQ_ENVIRONMENT || 
-      'production';
+    const clientId = config.clientId || process.env?.FEATUREFLAGSHQ_CLIENT_ID || process.env?.FEATUREFLAGSHQ_CLIENT_KEY; // Added CLIENT_KEY support
+    const clientSecret = config.clientSecret || process.env?.FEATUREFLAGSHQ_CLIENT_SECRET;
+    const environment = config.environment || process.env?.FEATUREFLAGSHQ_ENVIRONMENT || 'production';
 
     // Validate inputs
     if (!clientId || !clientSecret) {
@@ -454,7 +443,9 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       if (typeof window !== 'undefined') {
         // Browser environment
         cpuCount = navigator.hardwareConcurrency;
-        memoryTotal = (navigator as any).deviceMemory ? (navigator as any).deviceMemory * 1024 * 1024 * 1024 : undefined;
+        memoryTotal = (navigator as any).deviceMemory
+          ? (navigator as any).deviceMemory * 1024 * 1024 * 1024
+          : undefined;
       } else {
         // Node.js environment
         try {
@@ -469,17 +460,17 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       return {
         platform: process?.platform || 'unknown',
         node_version: process?.version || (typeof window !== 'undefined' ? 'browser' : 'unknown'),
-        hostname: os?.hostname ? os.hostname() : (typeof window !== 'undefined' ? window.location.hostname : 'unknown'),
+        hostname: os?.hostname ? os.hostname() : typeof window !== 'undefined' ? window.location.hostname : 'unknown',
         process_id: process?.pid || Math.floor(Math.random() * 10000),
         cpu_count: cpuCount,
-        memory_total: memoryTotal
+        memory_total: memoryTotal,
       };
     } catch (error) {
       return {
         platform: 'unknown',
         node_version: 'unknown',
         hostname: 'unknown',
-        process_id: Math.floor(Math.random() * 10000)
+        process_id: Math.floor(Math.random() * 10000),
       };
     }
   }
@@ -584,7 +575,8 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     if (userLimit) {
       const [count, lastTime] = userLimit;
       if (currentTime - lastTime < 60000) {
-        if (count > 1000) { // Max 1000 requests per minute per user
+        if (count > 1000) {
+          // Max 1000 requests per minute per user
           logger.warn(`Rate limit exceeded for user: ${userId}`);
           return false;
         }
@@ -601,8 +593,10 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
   private checkCircuitBreaker(): boolean {
     if (this.circuitBreaker.state === 'open') {
-      if (this.circuitBreaker.last_failure_time &&
-          (Date.now() - this.circuitBreaker.last_failure_time) > this.circuitBreaker.recovery_timeout) {
+      if (
+        this.circuitBreaker.last_failure_time &&
+        Date.now() - this.circuitBreaker.last_failure_time > this.circuitBreaker.recovery_timeout
+      ) {
         this.circuitBreaker.state = 'half-open';
         logger.info('Circuit breaker moved to half-open state');
         return true;
@@ -653,7 +647,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
   private async generateSignature(payload: string, timestamp: string): Promise<string> {
     const message = `${this.clientId}:${timestamp}:${payload}`;
-    
+
     if (typeof window !== 'undefined') {
       // Browser environment - async crypto
       const hmac = crypto.createHmac('sha256', this.clientSecret);
@@ -661,10 +655,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       return signature;
     } else {
       // Node.js environment - sync crypto
-      const signature = crypto
-        .createHmac('sha256', this.clientSecret)
-        .update(message)
-        .digest('base64');
+      const signature = crypto.createHmac('sha256', this.clientSecret).update(message).digest('base64');
       return signature;
     }
   }
@@ -682,7 +673,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       'X-Session-ID': this.sessionId,
       'X-SDK-Version': SDK_VERSION,
       'X-Environment': this.environment,
-      'User-Agent': `${USER_AGENT_PREFIX}/${SDK_VERSION}`
+      'User-Agent': `${USER_AGENT_PREFIX}/${SDK_VERSION}`,
     };
   }
 
@@ -701,7 +692,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       const response = await globalFetch(url, {
         method: 'GET',
         headers,
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
@@ -731,7 +722,6 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
       logger.info(`Fetched ${Object.keys(flags).length} flags from server`);
       return flags;
-
     } catch (error: any) {
       if (error.name === 'AbortError') {
         this.recordApiFailure('network_errors');
@@ -747,7 +737,11 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     }
   }
 
-  private async evaluateFlag(flagData: FlagData, userId: string, segments?: Record<string, any>): Promise<[any, EvaluationContext]> {
+  private async evaluateFlag(
+    flagData: FlagData,
+    userId: string,
+    segments?: Record<string, any>
+  ): Promise<[any, EvaluationContext]> {
     const startTime = Date.now();
 
     const evaluationContext: EvaluationContext = {
@@ -757,7 +751,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       segments_matched: [],
       segments_evaluated: [],
       rollout_qualified: false,
-      reason: 'active_flag'
+      reason: 'active_flag',
     };
 
     if (!flagData.is_active) {
@@ -884,16 +878,23 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
       // Apply comparator
       switch (comparator) {
-        case '==': return userVal === segVal;
-        case '!=': return userVal !== segVal;
-        case '>': return userVal > segVal;
-        case '<': return userVal < segVal;
-        case '>=': return userVal >= segVal;
-        case '<=': return userVal <= segVal;
-        case 'contains': return String(userVal).includes(String(segVal));
-        default: return false;
+        case '==':
+          return userVal === segVal;
+        case '!=':
+          return userVal !== segVal;
+        case '>':
+          return userVal > segVal;
+        case '<':
+          return userVal < segVal;
+        case '>=':
+          return userVal >= segVal;
+        case '<=':
+          return userVal <= segVal;
+        case 'contains':
+          return String(userVal).includes(String(segVal));
+        default:
+          return false;
       }
-
     } catch (error) {
       return false;
     }
@@ -928,7 +929,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       int: 0,
       float: 0.0,
       json: {},
-      string: ''
+      string: '',
     };
     return defaults[valueType] || '';
   }
@@ -944,8 +945,14 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     }
   }
 
-  private logAccess(userId: string, flagName: string, flagValue: any, evaluationContext: EvaluationContext, 
-                   evaluationTimeMs: number, segments?: Record<string, any>): void {
+  private logAccess(
+    userId: string,
+    flagName: string,
+    flagValue: any,
+    evaluationContext: EvaluationContext,
+    evaluationTimeMs: number,
+    segments?: Record<string, any>
+  ): void {
     if (!this.enableMetrics) return;
 
     const logEntry: LogEntry = {
@@ -959,11 +966,12 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       segments: segments || {},
       metadata: {
         sdk_version: SDK_VERSION,
-        environment: this.environment
-      }
+        environment: this.environment,
+      },
     };
 
-    if (this.logsQueue.length < 1000) { // Prevent memory bloat
+    if (this.logsQueue.length < 1000) {
+      // Prevent memory bloat
       this.logsQueue.push(logEntry);
     }
 
@@ -985,7 +993,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     return {
       session_id: this.sessionId,
       environment: {
-        name: this.environment
+        name: this.environment,
       },
       system_info: this.systemInfo,
       stats: {
@@ -999,9 +1007,9 @@ export class FeatureFlagsHQSDK extends EventEmitter {
           min_ms: evalTimes.min_ms === Infinity ? 0 : evalTimes.min_ms,
           max_ms: evalTimes.max_ms,
           total_ms: evalTimes.total_ms,
-          count: evalTimes.count
-        }
-      }
+          count: evalTimes.count,
+        },
+      },
     };
   }
 
@@ -1017,7 +1025,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       const url = `${this.apiBaseUrl}/v1/logs/batch/`;
       const payload = {
         logs,
-        session_metadata: this.getSessionMetadata()
+        session_metadata: this.getSessionMetadata(),
       };
       const payloadStr = JSON.stringify(payload);
       const headers = await this.getHeaders(payloadStr);
@@ -1029,7 +1037,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
         method: 'POST',
         headers,
         body: payloadStr,
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
@@ -1041,11 +1049,10 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       this.recordApiSuccess();
       this.stats.last_log_upload = new Date().toISOString();
       logger.debug(`Uploaded ${logs.length} log entries`);
-
     } catch (error: any) {
       this.recordApiFailure();
       logger.error(`Failed to upload logs: ${error.message}`);
-      
+
       // Put logs back in queue for retry (limit to prevent memory bloat)
       if (logs.length <= 10) {
         this.logsQueue.unshift(...logs);
@@ -1122,9 +1129,9 @@ export class FeatureFlagsHQSDK extends EventEmitter {
   }
 
   private generateUuid(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
       return v.toString(16);
     });
   }
@@ -1198,7 +1205,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
         reason: 'flag_not_found',
         segments_matched: [],
         segments_evaluated: [],
-        rollout_qualified: false
+        rollout_qualified: false,
       };
       evaluationTimeMs = 0;
     } else {
@@ -1220,14 +1227,24 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     return result;
   }
 
-  async getBool(userId: string, flagName: string, defaultValue = false, segments?: Record<string, any>): Promise<boolean> {
+  async getBool(
+    userId: string,
+    flagName: string,
+    defaultValue = false,
+    segments?: Record<string, any>
+  ): Promise<boolean> {
     const value = await this.get(userId, flagName, defaultValue, segments);
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') return ['true', '1', 'yes'].includes(value.toLowerCase());
     return value != null ? Boolean(value) : defaultValue;
   }
 
-  async getString(userId: string, flagName: string, defaultValue = '', segments?: Record<string, any>): Promise<string> {
+  async getString(
+    userId: string,
+    flagName: string,
+    defaultValue = '',
+    segments?: Record<string, any>
+  ): Promise<string> {
     const value = await this.get(userId, flagName, defaultValue, segments);
     return value != null ? String(value) : defaultValue;
   }
@@ -1243,7 +1260,12 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     }
   }
 
-  async getFloat(userId: string, flagName: string, defaultValue = 0.0, segments?: Record<string, any>): Promise<number> {
+  async getFloat(
+    userId: string,
+    flagName: string,
+    defaultValue = 0.0,
+    segments?: Record<string, any>
+  ): Promise<number> {
     const value = await this.get(userId, flagName, defaultValue, segments);
     try {
       if (value == null) return defaultValue;
@@ -1254,7 +1276,12 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     }
   }
 
-  async getJson(userId: string, flagName: string, defaultValue: any = {}, segments?: Record<string, any>): Promise<any> {
+  async getJson(
+    userId: string,
+    flagName: string,
+    defaultValue: any = {},
+    segments?: Record<string, any>
+  ): Promise<any> {
     const value = await this.get(userId, flagName, defaultValue, segments);
 
     if (typeof value === 'object') return value;
@@ -1273,7 +1300,11 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     return this.getBool(userId, flagName, false, segments);
   }
 
-  async getUserFlags(userId: string, segments?: Record<string, any>, flagKeys?: string[]): Promise<Record<string, any>> {
+  async getUserFlags(
+    userId: string,
+    segments?: Record<string, any>,
+    flagKeys?: string[]
+  ): Promise<Record<string, any>> {
     try {
       userId = this.validateUserId(userId);
     } catch (error: any) {
@@ -1285,7 +1316,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
     try {
       let flagsToEvaluate = Array.from(this.flags.entries());
-      
+
       if (flagKeys) {
         const validatedKeys: string[] = [];
         for (const key of flagKeys) {
@@ -1387,27 +1418,27 @@ export class FeatureFlagsHQSDK extends EventEmitter {
         pending_user_logs: this.logsQueue.length,
         circuit_breaker: {
           state: this.circuitBreaker.state,
-          failure_count: this.circuitBreaker.failure_count
+          failure_count: this.circuitBreaker.failure_count,
         },
         evaluation_times: {
           avg_ms: avgMs,
           min_ms: evalTimes.min_ms === Infinity ? 0 : evalTimes.min_ms,
           max_ms: evalTimes.max_ms,
           total_ms: evalTimes.total_ms,
-          count: evalTimes.count
+          count: evalTimes.count,
         },
         configuration: {
           polling_interval: POLLING_INTERVAL,
           log_upload_interval: LOG_UPLOAD_INTERVAL,
           offline_mode: this.offlineMode,
           enable_metrics: this.enableMetrics,
-          environment: this.environment
-        }
+          environment: this.environment,
+        },
       };
     } catch (error: any) {
       logger.error(`Error getting stats: ${error.message}`);
       return {
-        error: error.message
+        error: error.message,
       } as any;
     }
   }
@@ -1425,20 +1456,20 @@ export class FeatureFlagsHQSDK extends EventEmitter {
         last_sync: this.stats.last_sync,
         circuit_breaker: {
           state: this.circuitBreaker.state,
-          failure_count: this.circuitBreaker.failure_count
+          failure_count: this.circuitBreaker.failure_count,
         },
         system_info: {
           platform: this.systemInfo.platform,
           node_version: this.systemInfo.node_version,
-          hostname: this.systemInfo.hostname
+          hostname: this.systemInfo.hostname,
         },
-        initialization_complete: this.initializationComplete
+        initialization_complete: this.initializationComplete,
       };
     } catch (error: any) {
       logger.error(`Error getting health check: ${error.message}`);
       return {
         status: 'error',
-        error: error.message
+        error: error.message,
       } as any;
     }
   }
@@ -1494,7 +1525,12 @@ export function validateProductionConfig(config: SDKConfig): string[] {
   return warnings;
 }
 
-export function createProductionClient(clientId: string, clientSecret: string, environment: string, config: Partial<SDKConfig> = {}): FeatureFlagsHQSDK {
+export function createProductionClient(
+  clientId: string,
+  clientSecret: string,
+  environment: string,
+  config: Partial<SDKConfig> = {}
+): FeatureFlagsHQSDK {
   const secureConfig: SDKConfig = {
     timeout: 30000,
     maxRetries: 3,
@@ -1503,7 +1539,7 @@ export function createProductionClient(clientId: string, clientSecret: string, e
     ...config,
     clientId,
     clientSecret,
-    environment
+    environment,
   };
 
   // Validate configuration
