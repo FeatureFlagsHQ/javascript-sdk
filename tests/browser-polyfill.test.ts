@@ -2,6 +2,24 @@
  * Browser polyfill tests
  */
 
+// Mock window and browser globals before importing
+const mockWindow = {
+  crypto: {
+    subtle: {
+      digest: jest.fn().mockResolvedValue(new ArrayBuffer(32)),
+      importKey: jest.fn().mockResolvedValue({}),
+      sign: jest.fn().mockResolvedValue(new ArrayBuffer(32))
+    }
+  },
+  location: {
+    hostname: 'test.example.com'
+  }
+};
+
+const mockNavigator = {
+  platform: 'Test Platform'
+};
+
 describe('Browser Polyfills', () => {
   // Simple test to verify polyfills can be imported
   it('should import browser polyfills without errors', () => {
@@ -77,5 +95,41 @@ describe('Browser Polyfills', () => {
     
     expect(typeof hostname).toBe('string');
     expect(typeof platform).toBe('string');
+  });
+
+  describe('Browser Environment Simulation', () => {
+    // Test basic browser polyfill functionality without complex mocking
+
+    it('should provide browser-compatible polyfills', () => {
+      const { crypto, EventEmitter, process, os, fetch } = require('../src/browser-polyfill');
+      
+      // Test that all polyfills are available
+      expect(crypto).toBeDefined();
+      expect(EventEmitter).toBeDefined();
+      expect(process).toBeDefined();
+      expect(os).toBeDefined();
+      expect(fetch).toBeDefined();
+      
+      // Test basic functionality
+      expect(typeof crypto.createHash).toBe('function');
+      expect(typeof crypto.createHmac).toBe('function');
+    });
+
+  });
+
+  describe('Basic Functionality Tests', () => {
+    it('should handle crypto hash creation', () => {
+      const { crypto } = require('../src/browser-polyfill');
+      const hash = crypto.createHash('sha256');
+      expect(hash).toBeDefined();
+      expect(typeof hash.update).toBe('function');
+    });
+
+    it('should handle crypto HMAC creation', () => {
+      const { crypto } = require('../src/browser-polyfill');
+      const hmac = crypto.createHmac('sha256', 'secret');
+      expect(hmac).toBeDefined();
+      expect(typeof hmac.update).toBe('function');
+    });
   });
 });
