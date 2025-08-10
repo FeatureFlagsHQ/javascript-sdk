@@ -1,67 +1,113 @@
-# FeatureFlagsHQ SDK for JavaScript/TypeScript
+# FeatureFlagsHQ JavaScript SDK
 
-[![npm version](https://badge.fury.io/js/%40featureflagshq%2Fsdk.svg)](https://badge.fury.io/js/%40featureflagshq%2Fsdk)
+[![npm version](https://badge.fury.io/js/featureflagshq.svg)](https://badge.fury.io/js/featureflagshq)
+[![JavaScript Support](https://img.shields.io/badge/JavaScript-ES6+-yellow.svg)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![TypeScript Support](https://img.shields.io/badge/TypeScript-4.0+-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg)](http://www.typescriptlang.org/)
 
-Official FeatureFlagsHQ SDK for JavaScript/TypeScript with advanced security features, real-time updates, and comprehensive analytics.
+A secure, high-performance JavaScript/TypeScript SDK for [FeatureFlagsHQ](https://featureflagshq.com) feature flag management with enterprise-grade security, offline support, and comprehensive analytics. Works in both Node.js and browser environments.
 
 ## Features
 
-- 🚀 **High Performance**: Optimized for speed with local caching and minimal latency
-- 🔒 **Enterprise Security**: HMAC authentication, input validation, and rate limiting
-- 🌐 **Universal**: Works in Node.js and browser environments
-- 📊 **Advanced Analytics**: Comprehensive usage statistics and health monitoring
-- 🔄 **Real-time Updates**: Live flag updates with change callbacks
-- 🛡️ **Circuit Breaker**: Automatic failover protection for high availability
-- 📱 **Offline Support**: Graceful degradation when network is unavailable
-- 🎯 **Segment Targeting**: Advanced user segmentation and rollout controls
-- 📝 **Full TypeScript**: Complete type safety and IntelliSense support
+- 🔒 **Enterprise Security**: HMAC authentication, input validation, and security filtering
+- ⚡ **High Performance**: Background polling, caching, and circuit breaker patterns
+- 🌐 **Cross-Platform**: Works seamlessly in Node.js and browser environments
+- 📊 **Analytics & Metrics**: Comprehensive usage tracking and statistics
+- 🎯 **User Segmentation**: Advanced targeting based on user attributes
+- 🔄 **Real-time Updates**: Background flag synchronization with change callbacks
+- 🛡️ **Production Ready**: Rate limiting, error handling, and graceful degradation
+- 📘 **TypeScript First**: Full TypeScript support with comprehensive type definitions
 
 ## Installation
 
 ```bash
-npm install @featureflagshq/sdk
+npm install featureflagshq
 ```
 
-For Node.js environments, you may also need:
+Or with yarn:
 ```bash
-npm install node-fetch  # For Node.js < 18
+yarn add featureflagshq
 ```
 
 ## Quick Start
 
-### Basic Usage
+### TypeScript/ES6+
 
 ```typescript
-import { FeatureFlagsHQSDK } from '@featureflagshq/sdk';
+import { FeatureFlagsHQSDK } from 'featureflagshq';
 
 // Initialize the SDK
 const sdk = new FeatureFlagsHQSDK({
-  clientId: 'your-client-id',
-  clientSecret: 'your-client-secret',
-  environment: 'production'
+  clientId: 'your_client_id',
+  clientSecret: 'your_client_secret',
+  environment: 'production' // or "staging", "development"
 });
 
-// Wait for initialization
+// Wait for SDK to initialize
 sdk.on('ready', async () => {
-  // Get a feature flag value
-  const isNewFeatureEnabled = await sdk.getBool('user-123', 'new-feature-flag');
+  const userId = 'user_123';
+  const isEnabled = await sdk.getBool(userId, 'new_dashboard', false);
   
-  if (isNewFeatureEnabled) {
-    // Show new feature
-    console.log('New feature is enabled!');
+  if (isEnabled) {
+    console.log('New dashboard is enabled for this user!');
+  } else {
+    console.log('Using classic dashboard');
   }
+});
+
+// Clean shutdown
+process.on('SIGTERM', () => {
+  sdk.shutdown();
 });
 ```
 
+### CommonJS (Node.js)
+
+```javascript
+const { FeatureFlagsHQSDK } = require('featureflagshq');
+
+const sdk = new FeatureFlagsHQSDK({
+  clientId: 'your_client_id',
+  clientSecret: 'your_client_secret',
+  environment: 'production'
+});
+
+sdk.on('ready', async () => {
+  const userId = 'user_123';
+  const isEnabled = await sdk.getBool(userId, 'new_dashboard', false);
+  console.log(`Feature enabled: ${isEnabled}`);
+});
+```
+
+### Browser Usage
+
+```html
+<script src="https://unpkg.com/featureflagshq@latest/dist/featureflagshq.min.js"></script>
+<script>
+  const sdk = new FeatureFlagsHQSDK({
+    clientId: 'your_client_id',
+    clientSecret: 'your_client_secret',
+    environment: 'production'
+  });
+
+  sdk.on('ready', async () => {
+    const isEnabled = await sdk.getBool('user_123', 'new_feature', false);
+    if (isEnabled) {
+      document.getElementById('new-feature').style.display = 'block';
+    }
+  });
+</script>
+```
+
+## Configuration
+
 ### Environment Variables
 
-You can also configure the SDK using environment variables:
+The SDK can be configured using environment variables:
 
 ```bash
-export FEATUREFLAGSHQ_CLIENT_ID="your-client-id"
-export FEATUREFLAGSHQ_CLIENT_SECRET="your-client-secret"
+export FEATUREFLAGSHQ_CLIENT_ID="your_client_id"
+export FEATUREFLAGSHQ_CLIENT_SECRET="your_client_secret"
 export FEATUREFLAGSHQ_ENVIRONMENT="production"
 ```
 
@@ -70,303 +116,515 @@ export FEATUREFLAGSHQ_ENVIRONMENT="production"
 const sdk = new FeatureFlagsHQSDK();
 ```
 
-## Configuration Options
+### Advanced Configuration
 
 ```typescript
-const sdk = new FeatureFlagsHQSDK({
-  clientId: 'your-client-id',                    // Required: Your client ID
-  clientSecret: 'your-client-secret',            // Required: Your client secret
-  environment: 'production',                     // Environment name (default: 'production')
-  apiBaseUrl: 'https://api.featureflagshq.com', // API base URL
-  timeout: 30000,                                // Request timeout in ms (default: 30000)
-  maxRetries: 3,                                 // Max retry attempts (default: 3)
-  offlineMode: false,                            // Enable offline mode (default: false)
-  enableMetrics: true,                           // Enable usage analytics (default: true)
-  onFlagChange: (flagName, oldValue, newValue) => {
-    console.log(`Flag ${flagName} changed from ${oldValue} to ${newValue}`);
+import { FeatureFlagsHQSDK, SDKConfig } from 'featureflagshq';
+
+const config: SDKConfig = {
+  clientId: 'your_client_id',
+  clientSecret: 'your_client_secret',
+  environment: 'production',
+  apiBaseUrl: 'https://api.featureflagshq.com', // Custom API endpoint
+  timeout: 30000,                                // Request timeout (ms)
+  maxRetries: 3,                                 // Number of retries
+  offlineMode: false,                            // Enable offline mode
+  enableMetrics: true,                           // Enable analytics
+  onFlagChange: (name, oldValue, newValue) => {
+    console.log(`Flag ${name} changed from ${oldValue} to ${newValue}`);
   }
+};
+
+const sdk = new FeatureFlagsHQSDK(config);
+```
+
+## Usage Examples
+
+### Basic Flag Evaluation
+
+```typescript
+import { FeatureFlagsHQSDK } from 'featureflagshq';
+
+const sdk = new FeatureFlagsHQSDK({
+  clientId: 'your_client_id',
+  clientSecret: 'your_client_secret'
 });
+
+const userId = 'user_123';
+
+// Boolean flags
+const showBetaFeature = await sdk.getBool(userId, 'beta_feature', false);
+
+// String flags
+const buttonColor = await sdk.getString(userId, 'button_color', 'blue');
+
+// Integer flags
+const maxItems = await sdk.getInt(userId, 'max_items_per_page', 10);
+
+// Float flags
+const discountRate = await sdk.getFloat(userId, 'discount_rate', 0.0);
+
+// JSON flags
+const config = await sdk.getJson(userId, 'app_config', {});
 ```
 
-## API Reference
-
-### Flag Evaluation Methods
-
-#### `get(userId, flagName, defaultValue?, segments?)`
-Get a flag value with automatic type detection.
+### User Segmentation
 
 ```typescript
-const value = await sdk.get('user-123', 'my-flag', 'default-value');
-```
-
-#### `getBool(userId, flagName, defaultValue?, segments?)`
-Get a boolean flag value.
-
-```typescript
-const enabled = await sdk.getBool('user-123', 'feature-enabled', false);
-```
-
-#### `getString(userId, flagName, defaultValue?, segments?)`
-Get a string flag value.
-
-```typescript
-const message = await sdk.getString('user-123', 'welcome-message', 'Hello!');
-```
-
-#### `getInt(userId, flagName, defaultValue?, segments?)`
-Get an integer flag value.
-
-```typescript
-const timeout = await sdk.getInt('user-123', 'api-timeout', 5000);
-```
-
-#### `getFloat(userId, flagName, defaultValue?, segments?)`
-Get a float flag value.
-
-```typescript
-const rate = await sdk.getFloat('user-123', 'conversion-rate', 0.1);
-```
-
-#### `getJson(userId, flagName, defaultValue?, segments?)`
-Get a JSON flag value.
-
-```typescript
-const config = await sdk.getJson('user-123', 'app-config', {});
-```
-
-### Segment Targeting
-
-Use segments to target specific user groups:
-
-```typescript
-const segments = {
-  age: 25,
+// Define user segments for targeting
+const userSegments = {
   country: 'US',
-  plan: 'premium',
+  subscription: 'premium',
+  age: 25,
   beta_user: true
 };
 
-const isEnabled = await sdk.getBool('user-123', 'premium-feature', false, segments);
+// Evaluate flags with segments
+const isPremiumFeatureEnabled = await sdk.getBool(
+  'user_123',
+  'premium_analytics',
+  false,
+  userSegments
+);
 ```
 
-### Bulk Operations
-
-#### `getUserFlags(userId, segments?, flagKeys?)`
-Get multiple flags for a user at once.
+### Bulk Flag Evaluation
 
 ```typescript
 // Get all flags for a user
-const allFlags = await sdk.getUserFlags('user-123');
+const allFlags = await sdk.getUserFlags('user_123', userSegments);
+console.log('All flags for user:', allFlags);
 
 // Get specific flags only
-const specificFlags = await sdk.getUserFlags('user-123', {}, ['feature-a', 'feature-b']);
-
-// Get flags with segments
-const flagsWithSegments = await sdk.getUserFlags('user-123', { plan: 'premium' });
+const specificFlags = await sdk.getUserFlags(
+  'user_123',
+  userSegments,
+  ['feature_a', 'feature_b', 'feature_c']
+);
 ```
 
-#### `getAllFlags()`
-Get all cached flag configurations.
+### React Integration
 
-```typescript
-const flagConfigs = sdk.getAllFlags();
-```
+```tsx
+import React, { useState, useEffect } from 'react';
+import { FeatureFlagsHQSDK } from 'featureflagshq';
 
-### Management Methods
-
-#### `refreshFlags()`
-Manually refresh flags from the server.
-
-```typescript
-const success = await sdk.refreshFlags();
-```
-
-#### `flushLogs()`
-Manually upload pending analytics logs.
-
-```typescript
-const success = await sdk.flushLogs();
-```
-
-### Monitoring and Health
-
-#### `getStats()`
-Get comprehensive SDK usage statistics.
-
-```typescript
-const stats = sdk.getStats();
-console.log(`Total accesses: ${stats.total_user_accesses}`);
-console.log(`Unique users: ${stats.unique_users_count}`);
-console.log(`Cache hit rate: ${stats.api_calls.successful / stats.api_calls.total}`);
-```
-
-#### `getHealthCheck()`
-Get SDK health status.
-
-```typescript
-const health = sdk.getHealthCheck();
-console.log(`Status: ${health.status}`);
-console.log(`Last sync: ${health.last_sync}`);
-```
-
-### Event Handling
-
-The SDK extends EventEmitter and emits several events:
-
-```typescript
-sdk.on('ready', () => {
-  console.log('SDK is ready to use');
+const sdk = new FeatureFlagsHQSDK({
+  clientId: process.env.REACT_APP_FEATUREFLAGSHQ_CLIENT_ID,
+  clientSecret: process.env.REACT_APP_FEATUREFLAGSHQ_CLIENT_SECRET
 });
 
-sdk.on('error', (error) => {
-  console.error('SDK error:', error);
-});
+function App() {
+  const [showNewFeature, setShowNewFeature] = useState(false);
+  const [sdkReady, setSdkReady] = useState(false);
 
-sdk.on('shutdown', () => {
-  console.log('SDK has been shut down');
-});
-```
+  useEffect(() => {
+    sdk.on('ready', async () => {
+      setSdkReady(true);
+      const userId = 'user_123'; // Get from your auth system
+      const enabled = await sdk.getBool(userId, 'new_dashboard', false);
+      setShowNewFeature(enabled);
+    });
 
-### Cleanup
+    return () => {
+      sdk.shutdown();
+    };
+  }, []);
 
-Always shutdown the SDK when your application exits:
+  if (!sdkReady) {
+    return <div>Loading...</div>;
+  }
 
-```typescript
-// Graceful shutdown
-sdk.shutdown();
-
-// Or use try-with-resources pattern
-const sdk = new FeatureFlagsHQSDK(config);
-try {
-  // Use SDK
-} finally {
-  sdk.shutdown();
+  return (
+    <div>
+      {showNewFeature ? (
+        <NewDashboard />
+      ) : (
+        <ClassicDashboard />
+      )}
+    </div>
+  );
 }
 ```
 
-## Advanced Usage
-
-### Production Configuration
-
-Use the production helper for secure deployments:
+### Express.js Integration
 
 ```typescript
-import { createProductionClient } from '@featureflagshq/sdk';
+import express from 'express';
+import { FeatureFlagsHQSDK } from 'featureflagshq';
 
-const sdk = createProductionClient(
-  'your-client-id',
-  'your-client-secret',
-  'production',
-  {
-    timeout: 30000,
-    enableMetrics: true
+const app = express();
+
+// Initialize SDK once
+const sdk = new FeatureFlagsHQSDK({
+  clientId: process.env.FEATUREFLAGSHQ_CLIENT_ID,
+  clientSecret: process.env.FEATUREFLAGSHQ_CLIENT_SECRET
+});
+
+app.get('/dashboard', async (req, res) => {
+  const userId = req.user?.id; // Get from your auth system
+  
+  if (!userId) {
+    return res.redirect('/login');
   }
-);
+  
+  // Check if new dashboard is enabled
+  const useNewDashboard = await sdk.getBool(userId, 'new_dashboard_v2', false);
+  
+  if (useNewDashboard) {
+    res.render('dashboard_v2');
+  } else {
+    res.render('dashboard_v1');
+  }
+});
+
+// Clean shutdown when app closes
+process.on('SIGTERM', () => {
+  sdk.shutdown();
+  process.exit(0);
+});
+
+app.listen(3000);
+```
+
+### Next.js Integration
+
+```typescript
+// lib/featureflags.ts
+import { FeatureFlagsHQSDK } from 'featureflagshq';
+
+let sdk: FeatureFlagsHQSDK | null = null;
+
+export function getFeatureFlagsSDK(): FeatureFlagsHQSDK {
+  if (!sdk) {
+    sdk = new FeatureFlagsHQSDK({
+      clientId: process.env.FEATUREFLAGSHQ_CLIENT_ID!,
+      clientSecret: process.env.FEATUREFLAGSHQ_CLIENT_SECRET!,
+      environment: process.env.NODE_ENV
+    });
+  }
+  return sdk;
+}
+
+// pages/api/feature-check.ts
+import { NextApiRequest, NextApiResponse } from 'next';
+import { getFeatureFlagsSDK } from '../../lib/featureflags';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const sdk = getFeatureFlagsSDK();
+  const { userId, flagName } = req.query;
+  
+  const isEnabled = await sdk.getBool(
+    userId as string,
+    flagName as string,
+    false
+  );
+  
+  res.json({ enabled: isEnabled });
+}
+
+// pages/dashboard.tsx
+import { GetServerSideProps } from 'next';
+import { getFeatureFlagsSDK } from '../lib/featureflags';
+
+interface DashboardProps {
+  showNewFeature: boolean;
+}
+
+export default function Dashboard({ showNewFeature }: DashboardProps) {
+  return (
+    <div>
+      {showNewFeature ? <NewFeature /> : <OldFeature />}
+    </div>
+  );
+}
+
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const sdk = getFeatureFlagsSDK();
+  const userId = context.req.headers['user-id'] as string; // From your auth
+  
+  const showNewFeature = await sdk.getBool(userId, 'new_feature', false);
+  
+  return {
+    props: {
+      showNewFeature
+    }
+  };
+};
+```
+
+## Advanced Features
+
+### Flag Change Callbacks
+
+```typescript
+const sdk = new FeatureFlagsHQSDK({
+  clientId: 'your_client_id',
+  clientSecret: 'your_client_secret',
+  onFlagChange: (flagName, oldValue, newValue) => {
+    console.log(`Flag '${flagName}' changed from ${oldValue} to ${newValue}`);
+    // Trigger cache invalidation, send notifications, etc.
+  }
+});
+
+// Or add listeners after initialization
+sdk.on('flagChange', (flagName, oldValue, newValue) => {
+  // Handle flag changes
+});
+```
+
+### Manual Refresh and Cache Control
+
+```typescript
+// Manually refresh flags from server
+const success = await sdk.refreshFlags();
+if (success) {
+  console.log('Flags refreshed successfully');
+}
+
+// Get all cached flags
+const allFlags = sdk.getAllFlags();
+console.log('Cached flags:', Object.keys(allFlags));
+
+// Force log upload
+await sdk.flushLogs();
+```
+
+### SDK Health and Statistics
+
+```typescript
+// Get SDK health status
+const health = sdk.getHealthCheck();
+console.log(`SDK Status: ${health.status}`);
+console.log(`Cached Flags: ${health.cached_flags_count}`);
+
+// Get detailed usage statistics
+const stats = sdk.getStats();
+console.log(`Total API calls: ${stats.api_calls.total}`);
+console.log(`Unique users: ${stats.unique_users_count}`);
+console.log(`Circuit breaker state: ${stats.circuit_breaker.state}`);
 ```
 
 ### Offline Mode
 
-For applications that need to work without network connectivity:
-
 ```typescript
+// Enable offline mode for environments without internet
 const sdk = new FeatureFlagsHQSDK({
-  clientId: 'your-client-id',
-  clientSecret: 'your-client-secret',
-  offlineMode: true  // Disables network calls
+  clientId: 'your_client_id',
+  clientSecret: 'your_client_secret',
+  offlineMode: true
 });
+
+// All flag evaluations will use default values in offline mode
+const result = await sdk.getBool('user_123', 'feature_flag', true);
 ```
-
-### Rate Limiting
-
-The SDK includes built-in rate limiting (1000 requests per minute per user) to protect your infrastructure.
-
-### Circuit Breaker
-
-Automatic circuit breaker protection prevents cascading failures:
-- Opens after 5 consecutive failures
-- Enters half-open state after 60 seconds
-- Automatically closes on successful requests
 
 ## Error Handling
 
-The SDK handles errors gracefully and provides detailed error information:
+The SDK includes comprehensive error handling and graceful degradation:
 
 ```typescript
 try {
-  const value = await sdk.getBool('user-123', 'my-flag');
+  const sdk = new FeatureFlagsHQSDK({
+    clientId: 'invalid_client_id',
+    clientSecret: 'invalid_secret'
+  });
+  
+  // SDK will continue to work but use default values
+  sdk.on('error', (error) => {
+    console.error('SDK Error:', error);
+  });
+  
+  // Check health to see if there are authentication issues
+  sdk.on('ready', () => {
+    const health = sdk.getHealthCheck();
+    if (health.status !== 'healthy') {
+      console.log('SDK not healthy:', health);
+    }
+  });
+  
 } catch (error) {
-  console.error('Flag evaluation failed:', error.message);
-  // SDK will return default value on errors
+  console.error('Configuration error:', error);
 }
 ```
 
-## Browser Support
+## Best Practices
 
-The SDK works in all modern browsers and includes polyfills for:
-- Fetch API
-- Crypto (Web Crypto API)
-- EventEmitter
-
-## Node.js Support
-
-- Node.js 14.0.0 or higher
-- Optional: `node-fetch` for Node.js < 18
-
-## TypeScript Support
-
-The SDK is written in TypeScript and includes comprehensive type definitions:
+### 1. Singleton Pattern
+Create one SDK instance per application and reuse it:
 
 ```typescript
-import { FeatureFlagsHQSDK, SDKConfig, FlagData } from '@featureflagshq/sdk';
+// Good - single instance
+const sdk = new FeatureFlagsHQSDK({
+  clientId: process.env.FEATUREFLAGSHQ_CLIENT_ID,
+  clientSecret: process.env.FEATUREFLAGSHQ_CLIENT_SECRET
+});
 
-const config: SDKConfig = {
-  clientId: 'your-client-id',
-  clientSecret: 'your-client-secret'
-};
-
-const sdk = new FeatureFlagsHQSDK(config);
+// Bad - creates multiple instances
+function getFlag() {
+  const sdk = new FeatureFlagsHQSDK({ /* config */ });
+  return sdk.getBool('user', 'flag');
+}
 ```
 
-## Security Features
+### 2. Always Provide Default Values
+```typescript
+// Good - provides fallback behavior
+const isEnabled = await sdk.getBool('user_123', 'new_feature', false);
+
+// Risky - might return undefined in error cases
+const isEnabled = await sdk.getBool('user_123', 'new_feature');
+```
+
+### 3. Wait for SDK Initialization
+```typescript
+// Good - wait for ready event
+sdk.on('ready', async () => {
+  const result = await sdk.getBool('user', 'flag', false);
+});
+
+// Or use promises
+await new Promise((resolve) => {
+  sdk.on('ready', resolve);
+});
+const result = await sdk.getBool('user', 'flag', false);
+```
+
+### 4. Monitor SDK Health
+```typescript
+// Periodically check SDK health in production
+setInterval(() => {
+  const health = sdk.getHealthCheck();
+  if (health.status !== 'healthy') {
+    console.warn('FeatureFlags SDK unhealthy:', health);
+  }
+}, 60000); // Check every minute
+```
+
+## API Reference
+
+### Constructor Options
+
+```typescript
+interface SDKConfig {
+  clientId?: string;
+  clientSecret?: string;
+  apiBaseUrl?: string;
+  environment?: string;
+  timeout?: number;
+  maxRetries?: number;
+  offlineMode?: boolean;
+  enableMetrics?: boolean;
+  onFlagChange?: (flagName: string, oldValue: any, newValue: any) => void;
+}
+```
+
+### Main Methods
+
+- `get(userId, flagName, defaultValue?, segments?)` - Get flag value with type inference
+- `getBool(userId, flagName, defaultValue?, segments?)` - Get boolean flag
+- `getString(userId, flagName, defaultValue?, segments?)` - Get string flag
+- `getInt(userId, flagName, defaultValue?, segments?)` - Get integer flag
+- `getFloat(userId, flagName, defaultValue?, segments?)` - Get float flag
+- `getJson(userId, flagName, defaultValue?, segments?)` - Get JSON flag
+- `getUserFlags(userId, segments?, flagKeys?)` - Get multiple flags for user
+- `isFlagEnabledForUser(userId, flagName, segments?)` - Check if flag is enabled
+
+### Management Methods
+
+- `refreshFlags()` - Manually refresh flags from server
+- `flushLogs()` - Upload pending analytics logs
+- `getAllFlags()` - Get all cached flag definitions
+- `getStats()` - Get SDK usage statistics
+- `getHealthCheck()` - Get SDK health status
+- `shutdown()` - Clean shutdown of background processes
+
+### Events
+
+- `ready` - SDK is initialized and ready to use
+- `error` - SDK encountered an error
+- `flagChange` - A flag value changed (if onFlagChange callback is set)
+- `shutdown` - SDK has been shut down
+
+## Browser Compatibility
+
+The SDK supports all modern browsers:
+
+- Chrome 60+
+- Firefox 55+
+- Safari 12+
+- Edge 79+
+
+For older browsers, ensure you have polyfills for:
+- `fetch` API
+- `Promise`
+- `EventTarget`
+
+## Node.js Compatibility
+
+- Node.js 16+
+- Compatible with ES modules and CommonJS
+
+## Production Utilities
+
+```typescript
+import { createProductionClient, validateProductionConfig } from 'featureflagshq';
+
+// Validate configuration before deployment
+const config = {
+  clientId: process.env.FEATUREFLAGSHQ_CLIENT_ID,
+  clientSecret: process.env.FEATUREFLAGSHQ_CLIENT_SECRET,
+  environment: 'production'
+};
+
+const warnings = validateProductionConfig(config);
+if (warnings.length > 0) {
+  console.warn('Configuration warnings:', warnings);
+}
+
+// Create production-ready client with security hardening
+const sdk = createProductionClient(
+  config.clientId!,
+  config.clientSecret!,
+  'production',
+  {
+    timeout: 30000,
+    maxRetries: 3
+  }
+);
+```
+
+## Security
+
+The SDK implements multiple security layers:
 
 - **HMAC Authentication**: All API requests are signed with HMAC-SHA256
-- **Input Validation**: Comprehensive validation prevents injection attacks
+- **Input Validation**: All inputs are validated and sanitized
+- **Security Filtering**: Sensitive data is filtered from logs
 - **Rate Limiting**: Per-user rate limiting prevents abuse
-- **Secure Logging**: Sensitive data is automatically redacted from logs
-- **Content Security**: Protection against XSS and injection attacks
+- **Circuit Breaker**: Automatic failure detection and recovery
+- **Cross-Platform Security**: Consistent security model across Node.js and browser
 
-## Performance
+## Support
 
-- **Local Caching**: Flags are cached locally for zero-latency access
-- **Background Updates**: Flags are updated every 5 minutes in the background
-- **Efficient Networking**: Minimal network usage with intelligent retry logic
-- **Memory Management**: Automatic cleanup prevents memory leaks
-
-## Analytics and Monitoring
-
-The SDK automatically collects analytics (can be disabled):
-
-- Flag usage statistics
-- User access patterns
-- Performance metrics
-- Error rates and types
-- Circuit breaker status
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+- **Documentation**: [https://docs.featureflagshq.com](https://docs.featureflagshq.com)
+- **Issues**: [GitHub Issues](https://github.com/featureflagshq/javascript-sdk/issues)
+- **Email**: hello@featureflagshq.com
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## Contributing
 
-- 📧 Email: support@featureflagshq.com
-- 📖 Documentation: https://docs.featureflagshq.com
-- 🐛 Issues: https://github.com/featureflagshq/sdk-node/issues
-- 💬 Community: https://community.featureflagshq.com
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for a list of changes and version history.
+See [CHANGELOG.md](CHANGELOG.md) for version history and updates.
