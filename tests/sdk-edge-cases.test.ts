@@ -9,6 +9,7 @@ const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
 
 describe('FeatureFlagsHQ SDK Edge Cases', () => {
   let sdk: FeatureFlagsHQSDK;
+  const sdkInstances: FeatureFlagsHQSDK[] = [];
 
   const validConfig = {
     clientId: 'test-client-id',
@@ -22,11 +23,31 @@ describe('FeatureFlagsHQ SDK Edge Cases', () => {
     mockFetch.mockClear();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Shut down main SDK instance
     if (sdk) {
       sdk.shutdown();
+      sdk = null as any;
     }
+    
+    // Shut down all tracked SDK instances
+    for (const instance of sdkInstances) {
+      if (instance) {
+        instance.shutdown();
+      }
+    }
+    sdkInstances.length = 0;
+    
+    // Wait a bit for async cleanup
+    await new Promise(resolve => setTimeout(resolve, 10));
   });
+
+  // Helper function to create and track SDK instances
+  const createSDK = (config: any): FeatureFlagsHQSDK => {
+    const instance = new FeatureFlagsHQSDK(config);
+    sdkInstances.push(instance);
+    return instance;
+  };
 
   describe('Configuration Edge Cases', () => {
     it('should handle empty string clientId', () => {
@@ -153,7 +174,7 @@ describe('FeatureFlagsHQ SDK Edge Cases', () => {
 
   describe('Flag Evaluation Edge Cases', () => {
     beforeEach(() => {
-      sdk = new FeatureFlagsHQSDK(validConfig);
+      sdk = createSDK(validConfig);
     });
 
     it('should handle null userId', async () => {
@@ -220,7 +241,7 @@ describe('FeatureFlagsHQ SDK Edge Cases', () => {
 
   describe('Network and Error Handling', () => {
     beforeEach(() => {
-      sdk = new FeatureFlagsHQSDK({
+      sdk = createSDK({
         ...validConfig,
         offlineMode: false, // Enable network operations
         timeout: 1000
@@ -243,7 +264,7 @@ describe('FeatureFlagsHQ SDK Edge Cases', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        headers: new Headers(),
+        headers: {} as any,
         redirected: false,
         type: 'basic',
         url: 'https://api.test.com',
@@ -266,7 +287,7 @@ describe('FeatureFlagsHQ SDK Edge Cases', () => {
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
-        headers: new Headers(),
+        headers: {} as any,
         redirected: false,
         type: 'basic',
         url: 'https://api.test.com',
@@ -289,7 +310,7 @@ describe('FeatureFlagsHQ SDK Edge Cases', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        headers: new Headers(),
+        headers: {} as any,
         redirected: false,
         type: 'basic',
         url: 'https://api.test.com',
@@ -317,7 +338,7 @@ describe('FeatureFlagsHQ SDK Edge Cases', () => {
 
   describe('Type Conversion Edge Cases', () => {
     beforeEach(() => {
-      sdk = new FeatureFlagsHQSDK(validConfig);
+      sdk = createSDK(validConfig);
     });
 
     it('should handle invalid JSON flag gracefully', async () => {
@@ -380,21 +401,19 @@ describe('FeatureFlagsHQ SDK Edge Cases', () => {
 
   describe('Memory and Resource Management', () => {
     it('should handle multiple SDK instances', () => {
-      const sdk1 = new FeatureFlagsHQSDK(validConfig);
-      const sdk2 = new FeatureFlagsHQSDK(validConfig);
-      const sdk3 = new FeatureFlagsHQSDK(validConfig);
+      const sdk1 = createSDK(validConfig);
+      const sdk2 = createSDK(validConfig);
+      const sdk3 = createSDK(validConfig);
 
       expect(sdk1).toBeDefined();
       expect(sdk2).toBeDefined();
       expect(sdk3).toBeDefined();
 
-      sdk1.shutdown();
-      sdk2.shutdown();
-      sdk3.shutdown();
+      // Instances will be automatically cleaned up in afterEach
     });
 
     it('should handle shutdown multiple times', () => {
-      sdk = new FeatureFlagsHQSDK(validConfig);
+      sdk = createSDK(validConfig);
       
       expect(() => {
         sdk.shutdown();
@@ -404,7 +423,7 @@ describe('FeatureFlagsHQ SDK Edge Cases', () => {
     });
 
     it('should handle operations after shutdown', async () => {
-      sdk = new FeatureFlagsHQSDK(validConfig);
+      sdk = createSDK(validConfig);
       sdk.shutdown();
 
       // Operations after shutdown should return default values
@@ -415,7 +434,7 @@ describe('FeatureFlagsHQ SDK Edge Cases', () => {
 
   describe('Concurrent Operations', () => {
     beforeEach(() => {
-      sdk = new FeatureFlagsHQSDK(validConfig);
+      sdk = createSDK(validConfig);
     });
 
     it('should handle concurrent flag evaluations', async () => {
