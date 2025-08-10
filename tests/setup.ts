@@ -84,3 +84,12 @@ jest.mock('os', () => ({
 
 // Set test environment variables
 process.env.NODE_ENV = 'test';
+
+// Global cleanup after all tests
+afterAll(async () => {
+  // Final cleanup - clear any remaining timers
+  jest.clearAllTimers();
+  
+  // Wait for final async cleanup
+  await new Promise(resolve => setTimeout(resolve, 50));
+});

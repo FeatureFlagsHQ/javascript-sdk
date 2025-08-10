@@ -688,6 +688,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+      timeoutId.unref?.();
 
       const response = await globalFetch(url, {
         method: 'GET',
@@ -1032,6 +1033,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+      timeoutId.unref?.();
 
       const response = await globalFetch(url, {
         method: 'POST',
@@ -1109,12 +1111,14 @@ export class FeatureFlagsHQSDK extends EventEmitter {
         this.pollingInterval = setInterval(() => {
           this.pollingWorker();
         }, POLLING_INTERVAL);
+        this.pollingInterval.unref?.(); // Prevent keeping process alive
 
         // Start log upload if metrics enabled
         if (this.enableMetrics) {
           this.logUploadInterval = setInterval(() => {
             this.uploadLogs();
           }, LOG_UPLOAD_INTERVAL);
+          this.logUploadInterval.unref?.(); // Prevent keeping process alive
         }
       }
 
@@ -1141,6 +1145,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
     return new Promise(resolve => {
       const timeoutId = setTimeout(resolve, timeout);
+      timeoutId.unref?.();
       this.once('ready', () => {
         clearTimeout(timeoutId);
         resolve();
@@ -1488,12 +1493,9 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       this.logUploadInterval = undefined;
     }
 
-    // Upload remaining logs
-    if (this.enableMetrics && !this.offlineMode) {
-      this.uploadLogs().catch(error => {
-        logger.warn(`Error during final log upload: ${error.message}`);
-      });
-    }
+    // Don't upload logs during shutdown to avoid hanging processes
+    // Clear any pending logs instead
+    this.logs = [];
 
     logger.info('SDK shutdown complete');
     this.emit('shutdown');

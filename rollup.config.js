@@ -1,7 +1,4 @@
-import typescript from 'rollup-plugin-typescript2';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
+const typescript = require('rollup-plugin-typescript2');
 const pkg = require('./package.json');
 
 const external = [
@@ -14,7 +11,7 @@ const external = [
   'util'
 ];
 
-export default [
+module.exports = [
   // CommonJS build
   {
     input: 'src/index.ts',
@@ -28,7 +25,7 @@ export default [
     plugins: [
       typescript({
         typescript: require('typescript'),
-        tsconfig: 'tsconfig.json',
+        tsconfig: 'tsconfig.build.json',
         clean: true
       })
     ]
@@ -45,7 +42,7 @@ export default [
     plugins: [
       typescript({
         typescript: require('typescript'),
-        tsconfig: 'tsconfig.json',
+        tsconfig: 'tsconfig.build.json',
         clean: true
       })
     ]
