@@ -8,9 +8,9 @@ export const crypto = (() => {
   if (typeof window !== 'undefined' && window.crypto) {
     // Browser environment
     return {
-      createHash: (algorithm: string) => ({
+      createHash: (_algorithm: string) => ({
         update: (data: string) => ({
-          digest: (encoding: string) => {
+          digest: (_encoding: string) => {
             const encoder = new TextEncoder();
             const dataBuffer = encoder.encode(data);
             return window.crypto.subtle.digest('SHA-256', dataBuffer).then(buffer => {
@@ -20,9 +20,9 @@ export const crypto = (() => {
           }
         })
       }),
-      createHmac: (algorithm: string, secret: string) => ({
+      createHmac: (_algorithm: string, secret: string) => ({
         update: (data: string) => ({
-          digest: (encoding: string) => {
+          digest: (_encoding: string) => {
             const encoder = new TextEncoder();
             const keyBuffer = encoder.encode(secret);
             const dataBuffer = encoder.encode(data);

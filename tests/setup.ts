@@ -31,9 +31,16 @@ global.fetch = jest.fn();
 // Mock crypto for tests
 const mockCrypto = {
   createHash: jest.fn().mockReturnValue({
-    update: jest.fn().mockReturnValue({
-      digest: jest.fn().mockReturnValue('mocked-hash')
-    })
+    update: jest.fn().mockImplementation((data: string) => ({
+      digest: jest.fn().mockImplementation(() => {
+        // Create a simple hash based on the input to make rollout testing work
+        let hash = 0;
+        for (let i = 0; i < data.length; i++) {
+          hash = ((hash << 5) - hash + data.charCodeAt(i)) & 0xffffffff;
+        }
+        return Math.abs(hash).toString(16).padStart(8, '0');
+      })
+    }))
   }),
   createHmac: jest.fn().mockReturnValue({
     update: jest.fn().mockReturnValue({
@@ -53,7 +60,7 @@ jest.mock('events', () => ({
       return this;
     }
     once(event: string, listener: Function) { return this.on(event, listener); }
-    off(event: string, listener: Function) { return this; }
+    off(_event: string, _listener: Function) { return this; }
     emit(event: string, ...args: any[]) { 
       const listeners = this.events.get(event);
       if (listeners) listeners.forEach(l => l(...args));

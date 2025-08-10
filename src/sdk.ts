@@ -1,5 +1,5 @@
 /**
- * FeatureFlagsHQ SDK - Core functionality
+ * FeatureFlagsHQ SDK - Core functionality with Enhanced Logging
  * TypeScript/JavaScript SDK for Node.js and Browser environments
  */
 
@@ -8,7 +8,7 @@ let crypto: any;
 let EventEmitter: any;
 let process: any;
 let os: any;
-let nodeFetch: any;
+// let nodeFetch: any; // Commented out as it's not used directly
 
 // Dynamic imports for different environments
 if (typeof window !== 'undefined') {
@@ -65,49 +65,48 @@ if (typeof window !== 'undefined') {
   process = {
     platform: 'browser',
     version: 'browser',
-    pid: 1,
+    pid: Math.floor(Math.random() * 10000),
     env: {}
   };
 
   os = {
     hostname: () => window.location.hostname || 'browser',
-    platform: () => navigator.platform || 'browser'
+    platform: () => navigator.platform || 'browser',
+    cpuCount: () => navigator.hardwareConcurrency || 1
   };
 
   // Browser crypto using Web Crypto API
   crypto = {
-    createHash: (algorithm: string) => ({
+    createHash: (_algorithm: string) => ({
       update: (data: string) => ({
-        digest: (encoding: string) => {
+        digest: async (_encoding: string) => {
           const encoder = new TextEncoder();
           const dataBuffer = encoder.encode(data);
-          return window.crypto.subtle.digest('SHA-256', dataBuffer).then(buffer => {
-            const array = Array.from(new Uint8Array(buffer));
-            return array.map(b => b.toString(16).padStart(2, '0')).join('');
-          });
+          const buffer = await window.crypto.subtle.digest('SHA-256', dataBuffer);
+          const array = Array.from(new Uint8Array(buffer));
+          return array.map(b => b.toString(16).padStart(2, '0')).join('');
         }
       })
     }),
-    createHmac: (algorithm: string, secret: string) => ({
+    createHmac: (_algorithm: string, secret: string) => ({
       update: (data: string) => ({
-        digest: (encoding: string) => {
+        digest: async (_encoding: string) => {
           const encoder = new TextEncoder();
           const keyBuffer = encoder.encode(secret);
           const dataBuffer = encoder.encode(data);
           
-          return window.crypto.subtle.importKey(
+          const key = await window.crypto.subtle.importKey(
             'raw',
             keyBuffer,
             { name: 'HMAC', hash: 'SHA-256' },
             false,
             ['sign']
-          ).then(key => 
-            window.crypto.subtle.sign('HMAC', key, dataBuffer)
-          ).then(signature => {
-            const array = Array.from(new Uint8Array(signature));
-            const base64 = btoa(String.fromCharCode.apply(null, array as any));
-            return base64;
-          });
+          );
+          
+          const signature = await window.crypto.subtle.sign('HMAC', key, dataBuffer);
+          const array = Array.from(new Uint8Array(signature));
+          const base64 = btoa(String.fromCharCode.apply(null, array as any));
+          return base64;
         }
       })
     })
@@ -155,6 +154,7 @@ const POLLING_INTERVAL = 300000; // 5 minutes
 const LOG_UPLOAD_INTERVAL = 120000; // 2 minutes
 const MAX_UNIQUE_USERS_TRACKED = 10000;
 const MAX_UNIQUE_FLAGS_TRACKED = 1000;
+const ENABLE_LOGGING = false; // Added to match Python SDK
 
 // Types
 export interface FlagData {
@@ -171,22 +171,63 @@ export interface FlagData {
 export interface SegmentData {
   name: string;
   value: any;
-  type: 'string' | 'int' | 'float' | 'bool';
+  type: 'string' | 'int' | 'integer' | 'float' | 'bool' | 'boolean';
   comparator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains';
+  is_active?: boolean; // Added to match Python SDK
+}
+
+export interface EvaluationContext {
+  flag_active: boolean;
+  flag_found: boolean;
+  default_value_used: boolean;
+  segments_matched: string[];
+  segments_evaluated: string[];
+  rollout_qualified: boolean;
+  reason: string;
+  total_sdk_time_ms?: number;
 }
 
 export interface LogEntry {
   user_id: string;
   flag_name: string;
   flag_value: any;
-  segments?: Record<string, any>;
   timestamp: string;
   session_id: string;
+  evaluation_time_ms: number;
+  evaluation_context: EvaluationContext;
+  segments?: Record<string, any>;
+  metadata: {
+    sdk_version: string;
+    environment: string;
+  };
+}
+
+export interface SessionMetadata {
+  session_id: string;
+  environment: {
+    name: string;
+  };
   system_info: {
     platform: string;
     node_version: string;
     hostname: string;
     process_id: number;
+    cpu_count?: number;
+    memory_total?: number;
+  };
+  stats: {
+    total_user_accesses: number;
+    unique_users_count: number;
+    unique_flags_count: number;
+    segment_matches: number;
+    rollout_evaluations: number;
+    evaluation_times: {
+      avg_ms: number;
+      min_ms: number;
+      max_ms: number;
+      total_ms: number;
+      count: number;
+    };
   };
 }
 
@@ -194,6 +235,8 @@ export interface SDKStats {
   total_user_accesses: number;
   unique_users_count: number;
   unique_flags_count: number;
+  segment_matches: number;
+  rollout_evaluations: number;
   last_sync: string | null;
   last_log_upload: string | null;
   api_calls: {
@@ -212,6 +255,13 @@ export interface SDKStats {
   circuit_breaker: {
     state: string;
     failure_count: number;
+  };
+  evaluation_times: {
+    avg_ms: number;
+    min_ms: number;
+    max_ms: number;
+    total_ms: number;
+    count: number;
   };
   configuration: {
     polling_interval: number;
@@ -256,7 +306,7 @@ export interface SDKConfig {
   onFlagChange?: (flagName: string, oldValue: any, newValue: any) => void;
 }
 
-// Security Filter for logging
+// Security Filter for logging - Enhanced to match Python version
 class SecurityFilter {
   private static readonly SENSITIVE_PATTERNS = [
     /secret["']?\s*[:=]\s*["']?([^"'\s]+)/gi,
@@ -274,24 +324,30 @@ class SecurityFilter {
   }
 }
 
-// Logger with security filtering
+// Logger with security filtering - Enhanced with ENABLE_LOGGING check
 class Logger {
   private prefix = 'featureflagshq_sdk';
 
   info(message: string): void {
-    console.log(`[${this.prefix}] INFO: ${SecurityFilter.filter(message)}`);
+    if (ENABLE_LOGGING) {
+      console.log(`[${this.prefix}] INFO: ${SecurityFilter.filter(message)}`);
+    }
   }
 
   warn(message: string): void {
-    console.warn(`[${this.prefix}] WARN: ${SecurityFilter.filter(message)}`);
+    if (ENABLE_LOGGING) {
+      console.warn(`[${this.prefix}] WARN: ${SecurityFilter.filter(message)}`);
+    }
   }
 
   error(message: string): void {
-    console.error(`[${this.prefix}] ERROR: ${SecurityFilter.filter(message)}`);
+    if (ENABLE_LOGGING) {
+      console.error(`[${this.prefix}] ERROR: ${SecurityFilter.filter(message)}`);
+    }
   }
 
   debug(message: string): void {
-    if (process.env.NODE_ENV === 'development') {
+    if (ENABLE_LOGGING && process.env.NODE_ENV === 'development') {
       console.debug(`[${this.prefix}] DEBUG: ${SecurityFilter.filter(message)}`);
     }
   }
@@ -305,7 +361,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
   private apiBaseUrl: string;
   private environment: string;
   private timeout: number;
-  private maxRetries: number; // Used for future retry logic implementation
+  // private maxRetries: number; // Currently not used in implementation
   private offlineMode: boolean;
   private enableMetrics: boolean;
   private onFlagChange?: (flagName: string, oldValue: any, newValue: any) => void;
@@ -316,7 +372,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
   private logsQueue: LogEntry[] = [];
   private initializationComplete = false;
 
-  // Statistics
+  // Enhanced statistics for session metadata
   private stats = {
     total_user_accesses: 0,
     unique_users: new Set<string>(),
@@ -324,7 +380,15 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     last_sync: null as string | null,
     last_log_upload: null as string | null,
     api_calls: { successful: 0, failed: 0, total: 0 },
-    errors: { network_errors: 0, auth_errors: 0, other_errors: 0 }
+    errors: { network_errors: 0, auth_errors: 0, other_errors: 0 },
+    segment_matches: 0,
+    rollout_evaluations: 0,
+    evaluation_times: {
+      total_ms: 0,
+      count: 0,
+      min_ms: Infinity,
+      max_ms: 0
+    }
   };
 
   // Circuit breaker
@@ -343,17 +407,20 @@ export class FeatureFlagsHQSDK extends EventEmitter {
   private pollingInterval?: NodeJS.Timeout;
   private logUploadInterval?: NodeJS.Timeout;
 
+  // System info for session metadata
+  private systemInfo: any;
+
   constructor(config: SDKConfig = {}) {
     super();
 
-    // Get credentials from environment if not provided
+    // Get credentials from environment if not provided - Enhanced to match Python SDK
     const clientId = config.clientId || 
-      process.env.FEATUREFLAGSHQ_CLIENT_ID || 
-      process.env.FEATUREFLAGSHQ_CLIENT_KEY;
+      process.env?.FEATUREFLAGSHQ_CLIENT_ID || 
+      process.env?.FEATUREFLAGSHQ_CLIENT_KEY; // Added CLIENT_KEY support
     const clientSecret = config.clientSecret || 
-      process.env.FEATUREFLAGSHQ_CLIENT_SECRET;
+      process.env?.FEATUREFLAGSHQ_CLIENT_SECRET;
     const environment = config.environment || 
-      process.env.FEATUREFLAGSHQ_ENVIRONMENT || 
+      process.env?.FEATUREFLAGSHQ_ENVIRONMENT || 
       'production';
 
     // Validate inputs
@@ -366,15 +433,55 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     this.apiBaseUrl = this.validateUrl(config.apiBaseUrl || DEFAULT_API_BASE_URL);
     this.environment = this.validateString(environment, 'environment');
     this.timeout = config.timeout || 30000;
-    this.maxRetries = config.maxRetries || 3;
+    // this.maxRetries = config.maxRetries || 3; // Currently not used in implementation
     this.offlineMode = config.offlineMode || false;
     this.enableMetrics = config.enableMetrics !== false;
     this.onFlagChange = config.onFlagChange;
 
     this.sessionId = this.generateUuid();
+    this.systemInfo = this.getSystemInfo();
 
     // Initialize SDK
     this.initialize();
+  }
+
+  private getSystemInfo(): any {
+    try {
+      // Get memory info if available
+      let memoryTotal: number | undefined;
+      let cpuCount: number | undefined;
+
+      if (typeof window !== 'undefined') {
+        // Browser environment
+        cpuCount = navigator.hardwareConcurrency;
+        memoryTotal = (navigator as any).deviceMemory ? (navigator as any).deviceMemory * 1024 * 1024 * 1024 : undefined;
+      } else {
+        // Node.js environment
+        try {
+          cpuCount = os.cpus().length;
+          memoryTotal = os.totalmem();
+        } catch (error) {
+          cpuCount = undefined;
+          memoryTotal = undefined;
+        }
+      }
+
+      return {
+        platform: process?.platform || 'unknown',
+        node_version: process?.version || (typeof window !== 'undefined' ? 'browser' : 'unknown'),
+        hostname: os?.hostname ? os.hostname() : (typeof window !== 'undefined' ? window.location.hostname : 'unknown'),
+        process_id: process?.pid || Math.floor(Math.random() * 10000),
+        cpu_count: cpuCount,
+        memory_total: memoryTotal
+      };
+    } catch (error) {
+      return {
+        platform: 'unknown',
+        node_version: 'unknown',
+        hostname: 'unknown',
+        process_id: Math.floor(Math.random() * 10000)
+      };
+    }
   }
 
   private validateUrl(url: string): string {
@@ -386,6 +493,9 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       const parsed = new URL(url);
       if (!['http:', 'https:'].includes(parsed.protocol)) {
         throw new Error('Invalid URL scheme. Only http and https are allowed');
+      }
+      if (!parsed.hostname) {
+        throw new Error('Invalid URL: missing hostname');
       }
       return url.replace(/\/$/, '');
     } catch (error) {
@@ -541,18 +651,27 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     }
   }
 
-  private generateSignature(payload: string, timestamp: string): string {
+  private async generateSignature(payload: string, timestamp: string): Promise<string> {
     const message = `${this.clientId}:${timestamp}:${payload}`;
-    const signature = crypto
-      .createHmac('sha256', this.clientSecret)
-      .update(message)
-      .digest('base64');
-    return signature;
+    
+    if (typeof window !== 'undefined') {
+      // Browser environment - async crypto
+      const hmac = crypto.createHmac('sha256', this.clientSecret);
+      const signature = await hmac.update(message).digest('base64');
+      return signature;
+    } else {
+      // Node.js environment - sync crypto
+      const signature = crypto
+        .createHmac('sha256', this.clientSecret)
+        .update(message)
+        .digest('base64');
+      return signature;
+    }
   }
 
-  private getHeaders(payload = ''): Record<string, string> {
+  private async getHeaders(payload = ''): Promise<Record<string, string>> {
     const timestamp = Math.floor(Date.now() / 1000).toString();
-    const signature = this.generateSignature(payload, timestamp);
+    const signature = await this.generateSignature(payload, timestamp);
 
     return {
       'Content-Type': 'application/json',
@@ -574,7 +693,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
     try {
       const url = `${this.apiBaseUrl}/v1/flags/`;
-      const headers = this.getHeaders('');
+      const headers = await this.getHeaders('');
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -628,68 +747,137 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     }
   }
 
-  private evaluateFlag(flagData: FlagData, userId: string, segments?: Record<string, any>): any {
+  private async evaluateFlag(flagData: FlagData, userId: string, segments?: Record<string, any>): Promise<[any, EvaluationContext]> {
+    const startTime = Date.now();
+
+    const evaluationContext: EvaluationContext = {
+      flag_active: flagData.is_active || true,
+      flag_found: true,
+      default_value_used: false,
+      segments_matched: [],
+      segments_evaluated: [],
+      rollout_qualified: false,
+      reason: 'active_flag'
+    };
+
     if (!flagData.is_active) {
-      return this.getDefaultValue(flagData.type);
+      evaluationContext.default_value_used = true;
+      evaluationContext.reason = 'flag_inactive';
+      const value = this.getDefaultValue(flagData.type);
+      const evaluationTime = Date.now() - startTime;
+      evaluationContext.total_sdk_time_ms = evaluationTime;
+      return [value, evaluationContext];
     }
 
-    // Check segments if provided
-    if (segments && flagData.segments) {
-      const segmentMatch = this.checkSegments(flagData.segments, segments);
-      if (!segmentMatch) {
-        return this.getDefaultValue(flagData.type);
+    // Check segments if they exist on the flag - Enhanced to match Python SDK
+    const flagSegments = flagData.segments;
+    if (flagSegments) {
+      // Filter out inactive segments - NEW: matches Python SDK
+      const activeSegments = flagSegments.filter(seg => seg.is_active !== false);
+
+      if (activeSegments.length > 0) {
+        const segmentsMatched: string[] = [];
+        const segmentsEvaluated: string[] = [];
+
+        for (const segment of activeSegments) {
+          const segmentName = segment.name || '';
+          segmentsEvaluated.push(segmentName);
+
+          if (this.checkSegmentMatch(segment, segments || {})) {
+            segmentsMatched.push(segmentName);
+          }
+        }
+
+        evaluationContext.segments_matched = segmentsMatched;
+        evaluationContext.segments_evaluated = segmentsEvaluated;
+
+        // Update stats
+        this.stats.segment_matches += segmentsMatched.length;
+
+        // If there are active segments but none matched, return default - Enhanced logic
+        if (segmentsMatched.length === 0) {
+          evaluationContext.default_value_used = true;
+          evaluationContext.reason = 'segment_not_matched';
+          const value = this.getDefaultValue(flagData.type);
+          const evaluationTime = Date.now() - startTime;
+          evaluationContext.total_sdk_time_ms = evaluationTime;
+          return [value, evaluationContext];
+        }
       }
     }
 
     // Check rollout percentage
     const rolloutPercentage = flagData.rollout?.percentage || 100;
     if (rolloutPercentage < 100) {
-      const userHash = crypto
-        .createHash('sha256')
-        .update(`${flagData.name}:${userId}`)
-        .digest('hex');
+      this.stats.rollout_evaluations++;
+
+      const userHash = await this.createHash(`${flagData.name}:${userId}`);
       const userPercentage = parseInt(userHash.substring(0, 8), 16) % 100;
-      if (userPercentage >= rolloutPercentage) {
-        return this.getDefaultValue(flagData.type);
+
+      if (userPercentage < rolloutPercentage) {
+        evaluationContext.rollout_qualified = true;
+        evaluationContext.reason = 'rollout_qualified';
+      } else {
+        evaluationContext.default_value_used = true;
+        evaluationContext.reason = 'rollout_not_qualified';
+        const value = this.getDefaultValue(flagData.type);
+        const evaluationTime = Date.now() - startTime;
+        evaluationContext.total_sdk_time_ms = evaluationTime;
+        return [value, evaluationContext];
       }
     }
 
     // Return flag value
-    return this.convertValue(flagData.value, flagData.type);
+    const value = this.convertValue(flagData.value, flagData.type);
+    const evaluationTime = Date.now() - startTime;
+    evaluationContext.total_sdk_time_ms = evaluationTime;
+
+    // Update evaluation time stats
+    const evalTimes = this.stats.evaluation_times;
+    evalTimes.total_ms += evaluationTime;
+    evalTimes.count += 1;
+    evalTimes.min_ms = Math.min(evalTimes.min_ms, evaluationTime);
+    evalTimes.max_ms = Math.max(evalTimes.max_ms, evaluationTime);
+
+    return [value, evaluationContext];
   }
 
-  private checkSegments(flagSegments: SegmentData[], userSegments: Record<string, any>): boolean {
-    for (const segment of flagSegments) {
-      if (typeof segment !== 'object') continue;
-
-      if (segment.name in userSegments) {
-        if (this.evaluateSegment(segment, userSegments[segment.name])) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  private evaluateSegment(segment: SegmentData, userValue: any): boolean {
+  private checkSegmentMatch(segment: SegmentData, segments: Record<string, any>): boolean {
     try {
+      const segmentName = segment.name;
+      if (!segmentName || !(segmentName in segments)) {
+        return false;
+      }
+
       const comparator = segment.comparator || '==';
       const segmentValue = segment.value;
       const segmentType = segment.type || 'string';
+      const userValue = segments[segmentName];
 
-      // Convert values to same type
+      // Enhanced type conversion to match Python SDK
       let userVal: any, segVal: any;
 
-      if (segmentType === 'int') {
-        userVal = parseInt(userValue, 10);
-        segVal = parseInt(segmentValue, 10);
+      if (segmentType === 'int' || segmentType === 'integer') {
+        userVal = parseInt(String(parseFloat(String(userValue))), 10);
+        segVal = parseInt(String(parseFloat(String(segmentValue))), 10);
       } else if (segmentType === 'float') {
-        userVal = parseFloat(userValue);
-        segVal = parseFloat(segmentValue);
-      } else if (segmentType === 'bool') {
-        userVal = Boolean(userValue);
-        segVal = String(segmentValue).toLowerCase() === 'true';
+        userVal = parseFloat(String(userValue));
+        segVal = parseFloat(String(segmentValue));
+      } else if (segmentType === 'bool' || segmentType === 'boolean') {
+        // Enhanced boolean conversion to match Python SDK
+        if (typeof userValue === 'boolean') {
+          userVal = userValue;
+        } else {
+          userVal = ['true', '1', 'yes'].includes(String(userValue).toLowerCase());
+        }
+
+        if (typeof segmentValue === 'boolean') {
+          segVal = segmentValue;
+        } else {
+          segVal = ['true', '1', 'yes'].includes(String(segmentValue).toLowerCase());
+        }
       } else {
+        // str or string
         userVal = String(userValue);
         segVal = String(segmentValue);
       }
@@ -702,7 +890,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
         case '<': return userVal < segVal;
         case '>=': return userVal >= segVal;
         case '<=': return userVal <= segVal;
-        case 'contains': return String(userVal).includes(segVal);
+        case 'contains': return String(userVal).includes(String(segVal));
         default: return false;
       }
 
@@ -718,9 +906,11 @@ export class FeatureFlagsHQSDK extends EventEmitter {
           if (typeof value === 'boolean') return value;
           return ['true', '1', 'yes'].includes(String(value).toLowerCase());
         case 'int':
-          return parseInt(String(parseFloat(String(value))), 10);
+          const intVal = parseInt(String(parseFloat(String(value))), 10);
+          return isNaN(intVal) ? this.getDefaultValue(valueType) : intVal;
         case 'float':
-          return parseFloat(String(value));
+          const floatVal = parseFloat(String(value));
+          return isNaN(floatVal) ? this.getDefaultValue(valueType) : floatVal;
         case 'json':
           if (typeof value === 'object') return value;
           return JSON.parse(String(value));
@@ -743,21 +933,33 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     return defaults[valueType] || '';
   }
 
-  private logAccess(userId: string, flagName: string, flagValue: any, segments?: Record<string, any>): void {
+  private async createHash(data: string): Promise<string> {
+    if (typeof window !== 'undefined') {
+      // Browser environment
+      const hash = crypto.createHash('sha256');
+      return await hash.update(data).digest('hex');
+    } else {
+      // Node.js environment
+      return crypto.createHash('sha256').update(data).digest('hex');
+    }
+  }
+
+  private logAccess(userId: string, flagName: string, flagValue: any, evaluationContext: EvaluationContext, 
+                   evaluationTimeMs: number, segments?: Record<string, any>): void {
     if (!this.enableMetrics) return;
 
     const logEntry: LogEntry = {
       user_id: userId,
       flag_name: flagName,
       flag_value: flagValue,
-      segments: segments || {},
       timestamp: new Date().toISOString(),
       session_id: this.sessionId,
-      system_info: {
-        platform: process.platform,
-        node_version: process.version,
-        hostname: require('os').hostname(),
-        process_id: process.pid
+      evaluation_time_ms: evaluationTimeMs,
+      evaluation_context: evaluationContext,
+      segments: segments || {},
+      metadata: {
+        sdk_version: SDK_VERSION,
+        environment: this.environment
       }
     };
 
@@ -776,6 +978,33 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     }
   }
 
+  private getSessionMetadata(): SessionMetadata {
+    const evalTimes = this.stats.evaluation_times;
+    const avgMs = evalTimes.count > 0 ? evalTimes.total_ms / evalTimes.count : 0;
+
+    return {
+      session_id: this.sessionId,
+      environment: {
+        name: this.environment
+      },
+      system_info: this.systemInfo,
+      stats: {
+        total_user_accesses: this.stats.total_user_accesses,
+        unique_users_count: this.stats.unique_users.size,
+        unique_flags_count: this.stats.unique_flags_accessed.size,
+        segment_matches: this.stats.segment_matches,
+        rollout_evaluations: this.stats.rollout_evaluations,
+        evaluation_times: {
+          avg_ms: avgMs,
+          min_ms: evalTimes.min_ms === Infinity ? 0 : evalTimes.min_ms,
+          max_ms: evalTimes.max_ms,
+          total_ms: evalTimes.total_ms,
+          count: evalTimes.count
+        }
+      }
+    };
+  }
+
   private async uploadLogs(): Promise<void> {
     if (this.offlineMode || this.logsQueue.length === 0 || !this.checkCircuitBreaker()) {
       return;
@@ -786,9 +1015,12 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
     try {
       const url = `${this.apiBaseUrl}/v1/logs/batch/`;
-      const payload = { logs };
+      const payload = {
+        logs,
+        session_metadata: this.getSessionMetadata()
+      };
       const payloadStr = JSON.stringify(payload);
-      const headers = this.getHeaders(payloadStr);
+      const headers = await this.getHeaders(payloadStr);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -897,19 +1129,27 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     });
   }
 
+  private async waitForInitialization(timeout = 5000): Promise<void> {
+    if (this.initializationComplete) return;
+
+    return new Promise(resolve => {
+      const timeoutId = setTimeout(resolve, timeout);
+      this.once('ready', () => {
+        clearTimeout(timeoutId);
+        resolve();
+      });
+      this.once('error', () => {
+        clearTimeout(timeoutId);
+        resolve();
+      });
+    });
+  }
+
   // Public methods
 
   async get(userId: string, flagName: string, defaultValue: any = null, segments?: Record<string, any>): Promise<any> {
     // Wait for initialization if still in progress
-    if (!this.initializationComplete) {
-      await new Promise(resolve => {
-        const timeout = setTimeout(resolve, 5000);
-        this.once('ready', () => {
-          clearTimeout(timeout);
-          resolve(undefined);
-        });
-      });
-    }
+    await this.waitForInitialization();
 
     // Validate inputs
     try {
@@ -945,21 +1185,37 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     const flagData = this.flags.get(flagName);
 
     let result: any;
+    let evaluationContext: EvaluationContext;
+    let evaluationTimeMs: number;
+
     if (!flagData) {
       // Flag not found, return default
       result = defaultValue;
+      evaluationContext = {
+        flag_found: false,
+        flag_active: false,
+        default_value_used: true,
+        reason: 'flag_not_found',
+        segments_matched: [],
+        segments_evaluated: [],
+        rollout_qualified: false
+      };
+      evaluationTimeMs = 0;
     } else {
       // Evaluate flag
-      result = this.evaluateFlag(flagData, userId, segments);
+      const [flagResult, context] = await this.evaluateFlag(flagData, userId, segments);
+      result = flagResult;
+      evaluationContext = context;
+      evaluationTimeMs = context.total_sdk_time_ms || 0;
 
       // Use custom default if evaluation returned default and custom default provided
-      if (result === this.getDefaultValue(flagData.type) && defaultValue !== null) {
+      if (evaluationContext.default_value_used && defaultValue !== null) {
         result = defaultValue;
       }
     }
 
     // Log the access
-    this.logAccess(userId, flagName, result, segments);
+    this.logAccess(userId, flagName, result, evaluationContext, evaluationTimeMs, segments);
 
     return result;
   }
@@ -979,7 +1235,9 @@ export class FeatureFlagsHQSDK extends EventEmitter {
   async getInt(userId: string, flagName: string, defaultValue = 0, segments?: Record<string, any>): Promise<number> {
     const value = await this.get(userId, flagName, defaultValue, segments);
     try {
-      return value != null ? parseInt(String(parseFloat(String(value))), 10) : defaultValue;
+      if (value == null) return defaultValue;
+      const parsed = parseInt(String(parseFloat(String(value))), 10);
+      return isNaN(parsed) ? defaultValue : parsed;
     } catch {
       return defaultValue;
     }
@@ -988,7 +1246,9 @@ export class FeatureFlagsHQSDK extends EventEmitter {
   async getFloat(userId: string, flagName: string, defaultValue = 0.0, segments?: Record<string, any>): Promise<number> {
     const value = await this.get(userId, flagName, defaultValue, segments);
     try {
-      return value != null ? parseFloat(String(value)) : defaultValue;
+      if (value == null) return defaultValue;
+      const parsed = parseFloat(String(value));
+      return isNaN(parsed) ? defaultValue : parsed;
     } catch {
       return defaultValue;
     }
@@ -1040,8 +1300,12 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
       for (const [flagKey, flagData] of flagsToEvaluate) {
         try {
-          const flagValue = this.evaluateFlag(flagData, userId, segments);
+          const [flagValue, evaluationContext] = await this.evaluateFlag(flagData, userId, segments);
           userFlags[flagKey] = flagValue;
+
+          // Log each flag access
+          const evaluationTimeMs = evaluationContext.total_sdk_time_ms || 0;
+          this.logAccess(userId, flagKey, flagValue, evaluationContext, evaluationTimeMs, segments);
         } catch (error: any) {
           logger.error(`Error evaluating flag ${flagKey} for user ${userId}: ${error.message}`);
           // Set default based on flag type
@@ -1105,10 +1369,15 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
   getStats(): SDKStats {
     try {
+      const evalTimes = this.stats.evaluation_times;
+      const avgMs = evalTimes.count > 0 ? evalTimes.total_ms / evalTimes.count : 0;
+
       return {
         total_user_accesses: this.stats.total_user_accesses,
         unique_users_count: this.stats.unique_users.size,
         unique_flags_count: this.stats.unique_flags_accessed.size,
+        segment_matches: this.stats.segment_matches,
+        rollout_evaluations: this.stats.rollout_evaluations,
         last_sync: this.stats.last_sync,
         last_log_upload: this.stats.last_log_upload,
         api_calls: { ...this.stats.api_calls },
@@ -1119,6 +1388,13 @@ export class FeatureFlagsHQSDK extends EventEmitter {
         circuit_breaker: {
           state: this.circuitBreaker.state,
           failure_count: this.circuitBreaker.failure_count
+        },
+        evaluation_times: {
+          avg_ms: avgMs,
+          min_ms: evalTimes.min_ms === Infinity ? 0 : evalTimes.min_ms,
+          max_ms: evalTimes.max_ms,
+          total_ms: evalTimes.total_ms,
+          count: evalTimes.count
         },
         configuration: {
           polling_interval: POLLING_INTERVAL,
@@ -1152,9 +1428,9 @@ export class FeatureFlagsHQSDK extends EventEmitter {
           failure_count: this.circuitBreaker.failure_count
         },
         system_info: {
-          platform: process?.platform || 'unknown',
-          node_version: process?.version || 'unknown',
-          hostname: os?.hostname ? os.hostname() : 'unknown'
+          platform: this.systemInfo.platform,
+          node_version: this.systemInfo.node_version,
+          hostname: this.systemInfo.hostname
         },
         initialization_complete: this.initializationComplete
       };
