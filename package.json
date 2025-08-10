@@ -35,14 +35,14 @@
     "nodejs",
     "browser"
   ],
-  "author": "FeatureFlagsHQ <support@featureflagshq.com>",
+  "author": "FeatureFlagsHQ <hello@featureflagshq.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/featureflagshq/sdk-node.git"
+    "url": "https://github.com/featureflagshq/javascript-sdk.git"
   },
   "bugs": {
-    "url": "https://github.com/featureflagshq/sdk-node/issues"
+    "url": "https://github.com/featureflagshq/javascript-sdk/issues"
   },
   "homepage": "https://featureflagshq.com",
   "engines": {
