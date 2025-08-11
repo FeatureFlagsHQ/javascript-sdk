@@ -69,6 +69,8 @@ export const EventEmitter = (() => {
           this.off(event, onceWrapper);
           listener.apply(this, args);
         };
+        // Store reference to wrapper for cleanup
+        (onceWrapper as any)._originalListener = listener;
         return this.on(event, onceWrapper);
       }
 
@@ -86,7 +88,9 @@ export const EventEmitter = (() => {
       emit(event: string, ...args: any[]): boolean {
         const listeners = this.events.get(event);
         if (listeners) {
-          listeners.forEach(listener => listener.apply(this, args));
+          // Make a copy to avoid issues when listeners modify the array during iteration
+          const listenersCopy = [...listeners];
+          listenersCopy.forEach(listener => listener.apply(this, args));
           return true;
         }
         return false;

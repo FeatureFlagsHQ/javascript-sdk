@@ -200,6 +200,7 @@ export interface LogEntry {
 
 export interface SessionMetadata {
   session_id: string;
+  sdk_version: string;
   environment: {
     name: string;
   };
@@ -299,6 +300,8 @@ export interface SDKConfig {
   maxRetries?: number;
   offlineMode?: boolean;
   enableMetrics?: boolean;
+  pollingInterval?: number;
+  logUploadInterval?: number;
   onFlagChange?: (flagName: string, oldValue: any, newValue: any) => void;
 }
 
@@ -358,6 +361,8 @@ export class FeatureFlagsHQSDK extends EventEmitter {
   // private maxRetries: number; // Currently not used in implementation
   private offlineMode: boolean;
   private enableMetrics: boolean;
+  private pollingIntervalMs: number;
+  private logUploadIntervalMs: number;
   private onFlagChange?: (flagName: string, oldValue: any, newValue: any) => void;
 
   // Internal state
@@ -425,6 +430,8 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     // this.maxRetries = config.maxRetries || 3; // Currently not used in implementation
     this.offlineMode = config.offlineMode || false;
     this.enableMetrics = config.enableMetrics !== false;
+    this.pollingIntervalMs = config.pollingInterval || POLLING_INTERVAL;
+    this.logUploadIntervalMs = config.logUploadInterval || LOG_UPLOAD_INTERVAL;
     this.onFlagChange = config.onFlagChange;
 
     this.sessionId = this.generateUuid();
@@ -748,7 +755,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     const startTime = Date.now();
 
     const evaluationContext: EvaluationContext = {
-      flag_active: flagData.is_active || true,
+      flag_active: flagData.is_active !== false,
       flag_found: true,
       default_value_used: false,
       segments_matched: [],
@@ -794,7 +801,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
         // If there are active segments but none matched, return default - Enhanced logic
         if (segmentsMatched.length === 0) {
           evaluationContext.default_value_used = true;
-          evaluationContext.reason = 'segment_not_matched';
+          evaluationContext.reason = 'segments_not_matched';
           const value = this.getDefaultValue(flagData.type);
           const evaluationTime = Date.now() - startTime;
           evaluationContext.total_sdk_time_ms = evaluationTime;
@@ -822,12 +829,20 @@ export class FeatureFlagsHQSDK extends EventEmitter {
         evaluationContext.total_sdk_time_ms = evaluationTime;
         return [value, evaluationContext];
       }
+    } else {
+      // 100% rollout - user qualifies
+      evaluationContext.rollout_qualified = true;
     }
 
     // Return flag value
     const value = this.convertValue(flagData.value, flagData.type);
     const evaluationTime = Date.now() - startTime;
     evaluationContext.total_sdk_time_ms = evaluationTime;
+    
+    // Set final reason based on evaluation result
+    if (evaluationContext.segments_matched.length > 0 || !flagSegments || flagSegments.length === 0) {
+      evaluationContext.reason = 'flag_active_and_matched';
+    }
 
     // Update evaluation time stats
     const evalTimes = this.stats.evaluation_times;
@@ -911,10 +926,10 @@ export class FeatureFlagsHQSDK extends EventEmitter {
           return ['true', '1', 'yes'].includes(String(value).toLowerCase());
         case 'int':
           const intVal = parseInt(String(parseFloat(String(value))), 10);
-          return isNaN(intVal) ? this.getDefaultValue(valueType) : intVal;
+          return isNaN(intVal) ? null : intVal;
         case 'float':
           const floatVal = parseFloat(String(value));
-          return isNaN(floatVal) ? this.getDefaultValue(valueType) : floatVal;
+          return isNaN(floatVal) ? null : floatVal;
         case 'json':
           if (typeof value === 'object') return value;
           return JSON.parse(String(value));
@@ -934,7 +949,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       json: {},
       string: '',
     };
-    return defaults[valueType] || '';
+    return defaults[valueType] !== undefined ? defaults[valueType] : null;
   }
 
   private async createHash(data: string): Promise<string> {
@@ -995,6 +1010,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
     return {
       session_id: this.sessionId,
+      sdk_version: SDK_VERSION,
       environment: {
         name: this.environment,
       },
@@ -1114,14 +1130,14 @@ export class FeatureFlagsHQSDK extends EventEmitter {
         // Start background polling
         this.pollingInterval = setInterval(() => {
           this.pollingWorker();
-        }, POLLING_INTERVAL);
+        }, this.pollingIntervalMs);
         this.pollingInterval.unref?.(); // Prevent keeping process alive
 
         // Start log upload if metrics enabled
         if (this.enableMetrics) {
           this.logUploadInterval = setInterval(() => {
             this.uploadLogs();
-          }, LOG_UPLOAD_INTERVAL);
+          }, this.logUploadIntervalMs);
           this.logUploadInterval.unref?.(); // Prevent keeping process alive
         }
       }
@@ -1446,8 +1462,8 @@ export class FeatureFlagsHQSDK extends EventEmitter {
           count: evalTimes.count,
         },
         configuration: {
-          polling_interval: POLLING_INTERVAL,
-          log_upload_interval: LOG_UPLOAD_INTERVAL,
+          polling_interval: this.pollingIntervalMs,
+          log_upload_interval: this.logUploadIntervalMs,
           offline_mode: this.offlineMode,
           enable_metrics: this.enableMetrics,
           environment: this.environment,
@@ -1508,7 +1524,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
     // Don't upload logs during shutdown to avoid hanging processes
     // Clear any pending logs instead
-    this.logs = [];
+    this.logsQueue = [];
 
     logger.info('SDK shutdown complete');
     this.emit('shutdown');

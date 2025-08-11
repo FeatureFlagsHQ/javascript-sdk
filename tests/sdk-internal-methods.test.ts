@@ -206,7 +206,7 @@ describe('FeatureFlagsHQ SDK - Internal Methods Coverage', () => {
       mockFetch.mockImplementation(() => {
         attemptCount++;
         // Fail first few attempts to trigger circuit breaker
-        if (attemptCount <= 3) {
+        if (attemptCount <= 5) {
           return Promise.reject(new Error('Service unavailable'));
         }
         return Promise.resolve({
@@ -223,7 +223,7 @@ describe('FeatureFlagsHQ SDK - Internal Methods Coverage', () => {
       });
 
       // Wait for enough failures to open circuit breaker
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const stats = sdk.getStats();
       expect(stats.circuit_breaker.failure_count).toBeGreaterThan(0);
@@ -484,7 +484,7 @@ describe('FeatureFlagsHQ SDK - Internal Methods Coverage', () => {
       expect(metadata1).toBeDefined();
       expect(metadata1.session_id).toBe(metadata2.session_id);
       expect(metadata1.sdk_version).toBeDefined();
-      expect(metadata1.environment).toBe('test');
+      expect(metadata1.environment.name).toBe('test');
       expect(metadata1.system_info).toBeDefined();
     });
 
@@ -699,7 +699,7 @@ describe('FeatureFlagsHQ SDK - Internal Methods Coverage', () => {
 
       await sdk.getString('test-user', 'log-test-flag', 'default');
 
-      const logs = (sdk as any).logs;
+      const logs = (sdk as any).logsQueue;
       expect(logs.length).toBeGreaterThan(0);
 
       const logEntry = logs[0];
