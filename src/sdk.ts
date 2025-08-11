@@ -419,7 +419,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
 
     this.clientId = this.validateString(clientId, 'clientId');
     this.clientSecret = this.validateString(clientSecret, 'clientSecret');
-    this.apiBaseUrl = this.validateUrl(config.apiBaseUrl || DEFAULT_API_BASE_URL);
+    this.apiBaseUrl = this.validateUrl(config.apiBaseUrl !== undefined ? config.apiBaseUrl : DEFAULT_API_BASE_URL);
     this.environment = this.validateString(environment, 'environment');
     this.timeout = config.timeout || 30000;
     // this.maxRetries = config.maxRetries || 3; // Currently not used in implementation
@@ -610,9 +610,11 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     this.stats.api_calls.successful++;
     this.stats.api_calls.total++;
 
+    // Reset failure count on any successful call
+    this.circuitBreaker.failure_count = 0;
+
     if (this.circuitBreaker.state === 'half-open') {
       this.circuitBreaker.state = 'closed';
-      this.circuitBreaker.failure_count = 0;
       logger.info('Circuit breaker closed after successful call');
     }
   }
@@ -1014,13 +1016,13 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     };
   }
 
-  private async uploadLogs(): Promise<void> {
+  private async uploadLogs(): Promise<boolean> {
     if (this.offlineMode || this.logsQueue.length === 0 || !this.checkCircuitBreaker()) {
-      return;
+      return false;
     }
 
     const logs = this.logsQueue.splice(0, 100); // Upload in batches of 100
-    if (logs.length === 0) return;
+    if (logs.length === 0) return false;
 
     try {
       const url = `${this.apiBaseUrl}/v1/logs/batch/`;
@@ -1051,6 +1053,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       this.recordApiSuccess();
       this.stats.last_log_upload = new Date().toISOString();
       logger.debug(`Uploaded ${logs.length} log entries`);
+      return true;
     } catch (error: any) {
       this.recordApiFailure();
       logger.error(`Failed to upload logs: ${error.message}`);
@@ -1059,6 +1062,7 @@ export class FeatureFlagsHQSDK extends EventEmitter {
       if (logs.length <= 10) {
         this.logsQueue.unshift(...logs);
       }
+      return false;
     }
   }
 
@@ -1289,7 +1293,11 @@ export class FeatureFlagsHQSDK extends EventEmitter {
   ): Promise<any> {
     const value = await this.get(userId, flagName, defaultValue, segments);
 
-    if (typeof value === 'object') return value;
+    // If it's already a valid JSON type (object, array, boolean, number, null), return it
+    if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'object') {
+      return value;
+    }
+    
     if (typeof value === 'string') {
       try {
         return JSON.parse(value);
@@ -1394,9 +1402,14 @@ export class FeatureFlagsHQSDK extends EventEmitter {
     }
 
     try {
-      await this.uploadLogs();
-      logger.info('Logs manually flushed');
-      return true;
+      const uploadResult = await this.uploadLogs();
+      if (uploadResult) {
+        logger.info('Logs manually flushed');
+        return true;
+      } else {
+        logger.warn('Log flush failed - no logs uploaded');
+        return false;
+      }
     } catch (error: any) {
       logger.error(`Manual log flush failed: ${error.message}`);
       return false;
