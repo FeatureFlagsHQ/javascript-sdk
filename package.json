@@ -1,6 +1,6 @@
 {
   "name": "@featureflagshq/sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Official FeatureFlagsHQ SDK for JavaScript/TypeScript with advanced security features",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
