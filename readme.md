@@ -21,12 +21,12 @@ A secure, high-performance JavaScript/TypeScript SDK for [FeatureFlagsHQ](https:
 ## 📦 Installation
 
 ```bash
-npm install featureflagshq
+npm install @featureflagshq/sdk
 ```
 
 Or with yarn:
 ```bash
-yarn add featureflagshq
+yarn add @featureflagshq/sdk
 ```
 
 ## 🚀 Quick Start
@@ -34,7 +34,7 @@ yarn add featureflagshq
 ### TypeScript/ES6+
 
 ```typescript
-import { FeatureFlagsHQSDK } from 'featureflagshq';
+import { FeatureFlagsHQSDK } from '@featureflagshq/sdk';
 
 // Initialize the SDK
 const sdk = new FeatureFlagsHQSDK({
@@ -119,7 +119,7 @@ const sdk = new FeatureFlagsHQSDK();
 ### 🔧 Advanced Configuration
 
 ```typescript
-import { FeatureFlagsHQSDK, SDKConfig } from 'featureflagshq';
+import { FeatureFlagsHQSDK, SDKConfig } from '@featureflagshq/sdk';
 
 const config: SDKConfig = {
   clientId: 'your_client_id',
@@ -143,7 +143,7 @@ const sdk = new FeatureFlagsHQSDK(config);
 ### 🎯 Basic Flag Evaluation
 
 ```typescript
-import { FeatureFlagsHQSDK } from 'featureflagshq';
+import { FeatureFlagsHQSDK } from '@featureflagshq/sdk';
 
 const sdk = new FeatureFlagsHQSDK({
   clientId: 'your_client_id',
@@ -207,7 +207,7 @@ const specificFlags = await sdk.getUserFlags(
 
 ```tsx
 import React, { useState, useEffect } from 'react';
-import { FeatureFlagsHQSDK } from 'featureflagshq';
+import { FeatureFlagsHQSDK } from '@featureflagshq/sdk';
 
 const sdk = new FeatureFlagsHQSDK({
   clientId: process.env.REACT_APP_FEATUREFLAGSHQ_CLIENT_ID,
@@ -251,7 +251,7 @@ function App() {
 
 ```typescript
 import express from 'express';
-import { FeatureFlagsHQSDK } from 'featureflagshq';
+import { FeatureFlagsHQSDK } from '@featureflagshq/sdk';
 
 const app = express();
 
@@ -291,7 +291,7 @@ app.listen(3000);
 
 ```typescript
 // lib/featureflags.ts
-import { FeatureFlagsHQSDK } from 'featureflagshq';
+import { FeatureFlagsHQSDK } from '@featureflagshq/sdk';
 
 let sdk: FeatureFlagsHQSDK | null = null;
 
@@ -568,7 +568,7 @@ For older browsers, ensure you have polyfills for:
 ## 🏭 Production Utilities
 
 ```typescript
-import { createProductionClient, validateProductionConfig } from 'featureflagshq';
+import { createProductionClient, validateProductionConfig } from '@featureflagshq/sdk';
 
 // Validate configuration before deployment
 const config = {
