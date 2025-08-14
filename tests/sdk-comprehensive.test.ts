@@ -189,7 +189,7 @@ describe('FeatureFlagsHQ SDK - Comprehensive Coverage', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        headers: new Headers(),
+        headers: {} as any,
         redirected: false,
         type: 'basic',
         url: 'https://api.test.com',
