@@ -190,6 +190,8 @@ Use JSDoc comments for all public methods:
  * 
  * @example
  * ```typescript
+ * import { FeatureFlagsHQSDK } from '@featureflagshq/sdk';
+ * 
  * const sdk = new FeatureFlagsHQSDK({ clientId: 'your-id', clientSecret: 'your-secret' });
  * const isEnabled = await sdk.getBool('user123', 'new-checkout');
  * if (isEnabled) {

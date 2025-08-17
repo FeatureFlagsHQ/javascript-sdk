@@ -1,6 +1,6 @@
 # FeatureFlagsHQ JavaScript SDK
 
-[![npm version](https://badge.fury.io/js/featureflagshq.svg)](https://badge.fury.io/js/@featureflagshq/sdk)
+[![npm version](https://badge.fury.io/js/@featureflagshq%2Fsdk.svg)](https://badge.fury.io/js/@featureflagshq%2Fsdk)
 [![JavaScript Support](https://img.shields.io/badge/JavaScript-ES6+-yellow.svg)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![TypeScript Support](https://img.shields.io/badge/TypeScript-4.0+-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -64,7 +64,7 @@ process.on('SIGTERM', () => {
 ### CommonJS (Node.js)
 
 ```javascript
-const { FeatureFlagsHQSDK } = require('featureflagshq');
+const { FeatureFlagsHQSDK } = require('@featureflagshq/sdk');
 
 const sdk = new FeatureFlagsHQSDK({
   clientId: 'your_client_id',
@@ -82,7 +82,7 @@ sdk.on('ready', async () => {
 ### Browser Usage
 
 ```html
-<script src="https://unpkg.com/featureflagshq@latest/dist/featureflagshq.min.js"></script>
+<script src="https://unpkg.com/@featureflagshq/sdk@latest/dist/featureflagshq.min.js"></script>
 <script>
   const sdk = new FeatureFlagsHQSDK({
     clientId: 'your_client_id',
